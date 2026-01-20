@@ -11,7 +11,7 @@ Deploy Red Hat Sail Operator (OSSM 3.x) on vanilla Kubernetes (AKS, EKS, GKE) wi
 | [lburgazzoli/olm-extractor](https://github.com/lburgazzoli/olm-extractor) | Extract OLM bundles for non-OLM clusters |
 
 **OLM Bundle:** `registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle`
-- [Red Hat Catalog](https://catalog.redhat.com/software/containers/openshift-service-mesh/istio-operator-bundle)
+- [Red Hat Catalog](https://catalog.redhat.com/en/software/containers/openshift-service-mesh/istio-sail-operator-bundle/67ab6f5f9e87ae6cc720911a)
 
 ## Architecture
 

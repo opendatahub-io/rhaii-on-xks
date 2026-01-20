@@ -99,7 +99,7 @@ pullSecretFile: ""
 | Gateway API CRDs | v1.4.0 | Kubernetes SIG |
 | Gateway API Inference Extension | v1.2.0 | For LLM inference routing |
 
-**OLM Bundle:** `registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle` ([Red Hat Catalog](https://catalog.redhat.com/software/containers/openshift-service-mesh/istio-operator-bundle))
+**OLM Bundle:** `registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle` ([Red Hat Catalog](https://catalog.redhat.com/en/software/containers/openshift-service-mesh/istio-sail-operator-bundle/67ab6f5f9e87ae6cc720911a))
 
 ### Gateway API Inference Extension (llm-d) Compatibility
 
