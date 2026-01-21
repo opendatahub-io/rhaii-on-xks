@@ -1,0 +1,28 @@
+# llm-d-infra-xks configuration
+
+# =============================================================================
+# Pull Secret Configuration
+# =============================================================================
+# Option 1: Use system podman auth (recommended)
+#   Requires: ~/.config/containers/auth.json
+#   Setup: cp ~/pull-secret.txt ~/.config/containers/auth.json
+useSystemPodmanAuth: true
+
+# Option 2: Use pull secret file directly (set useSystemPodmanAuth: false)
+pullSecretFile: ""  # e.g., ~/pull-secret.txt
+
+# =============================================================================
+# Operators
+# =============================================================================
+
+# cert-manager operator (required for TLS)
+certManager:
+  enabled: true
+
+# sail-operator / Istio (required for gateway)
+sailOperator:
+  enabled: true
+
+# lws-operator (optional - for multi-node workloads)
+lwsOperator:
+  enabled: true
