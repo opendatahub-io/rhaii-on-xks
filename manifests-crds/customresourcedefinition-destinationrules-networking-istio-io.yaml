@@ -1702,6 +1702,8 @@ spec:
           type: object
       served: true
       storage: true
+      subresources:
+        status: {}
     - additionalPrinterColumns:
         - description: The name of a service from the service registry
           jsonPath: .spec.host
@@ -3381,6 +3383,8 @@ spec:
           type: object
       served: true
       storage: false
+      subresources:
+        status: {}
     - additionalPrinterColumns:
         - description: The name of a service from the service registry
           jsonPath: .spec.host
@@ -5060,3 +5064,5 @@ spec:
           type: object
       served: true
       storage: false
+      subresources:
+        status: {}

@@ -966,6 +966,8 @@ spec:
           type: object
       served: true
       storage: true
+      subresources:
+        status: {}
     - additionalPrinterColumns:
         - description: The names of gateways and sidecars that should apply these routes
           jsonPath: .spec.gateways
@@ -1909,6 +1911,8 @@ spec:
           type: object
       served: true
       storage: false
+      subresources:
+        status: {}
     - additionalPrinterColumns:
         - description: The names of gateways and sidecars that should apply these routes
           jsonPath: .spec.gateways
@@ -2852,3 +2856,5 @@ spec:
           type: object
       served: true
       storage: false
+      subresources:
+        status: {}

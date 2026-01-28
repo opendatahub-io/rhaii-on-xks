@@ -48,7 +48,7 @@ trap "rm -rf $TMP_DIR" EXIT
 
 # Extract manifests
 echo "[1/3] Extracting manifests..."
-podman run --rm $AUTH_ARG \
+podman run --rm --pull=always $AUTH_ARG \
   quay.io/lburgazzoli/olm-extractor:main \
   run "$BUNDLE_IMAGE" \
   -n istio-system \

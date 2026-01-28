@@ -1436,3 +1436,5 @@ spec:
               rule: self.metadata.name == 'default'
       served: true
       storage: true
+      subresources:
+        status: {}

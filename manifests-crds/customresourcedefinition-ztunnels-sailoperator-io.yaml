@@ -3290,6 +3290,8 @@ spec:
               rule: self.metadata.name == 'default'
       served: true
       storage: true
+      subresources:
+        status: {}
     - additionalPrinterColumns:
         - description: The namespace for the ztunnel component.
           jsonPath: .spec.namespace
@@ -6589,3 +6591,5 @@ spec:
               rule: self.metadata.name == 'default'
       served: true
       storage: false
+      subresources:
+        status: {}

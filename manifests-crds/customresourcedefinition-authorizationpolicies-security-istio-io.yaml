@@ -379,6 +379,8 @@ spec:
           type: object
       served: true
       storage: false
+      subresources:
+        status: {}
     - additionalPrinterColumns:
         - description: The operation to take.
           jsonPath: .spec.action
@@ -734,3 +736,5 @@ spec:
           type: object
       served: true
       storage: true
+      subresources:
+        status: {}

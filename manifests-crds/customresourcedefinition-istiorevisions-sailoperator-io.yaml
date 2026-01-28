@@ -9748,3 +9748,5 @@ spec:
               rule: 'self.metadata.name == ''default'' ? (!has(self.spec.values.revision) || size(self.spec.values.revision) == 0) : self.spec.values.revision == self.metadata.name'
       served: true
       storage: true
+      subresources:
+        status: {}

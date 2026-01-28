@@ -172,6 +172,8 @@ spec:
           type: object
       served: true
       storage: false
+      subresources:
+        status: {}
     - additionalPrinterColumns:
         - description: Defines the mTLS mode used for peer authentication.
           jsonPath: .spec.mtls.mode
@@ -320,3 +322,5 @@ spec:
           type: object
       served: true
       storage: true
+      subresources:
+        status: {}

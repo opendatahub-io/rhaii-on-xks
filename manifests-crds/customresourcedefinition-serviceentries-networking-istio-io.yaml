@@ -293,6 +293,8 @@ spec:
           type: object
       served: true
       storage: true
+      subresources:
+        status: {}
     - additionalPrinterColumns:
         - description: The hosts associated with the ServiceEntry
           jsonPath: .spec.hosts
@@ -563,6 +565,8 @@ spec:
           type: object
       served: true
       storage: false
+      subresources:
+        status: {}
     - additionalPrinterColumns:
         - description: The hosts associated with the ServiceEntry
           jsonPath: .spec.hosts
@@ -833,3 +837,5 @@ spec:
           type: object
       served: true
       storage: false
+      subresources:
+        status: {}
