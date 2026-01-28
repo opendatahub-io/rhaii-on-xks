@@ -67,6 +67,11 @@ releases:
         showlogs: true
         command: "kubectl"
         args: ["apply", "--server-side", "--force-conflicts", "-f", "manifests-crds/"]
+      # Fix webhook reconciliation loop (vanilla Kubernetes only)
+      - events: ["postsync"]
+        showlogs: true
+        command: "bash"
+        args: ["scripts/fix-webhook-loop.sh", "{{ .Values.namespace }}"]
       # Print next steps after install
       - events: ["postsync"]
         showlogs: true

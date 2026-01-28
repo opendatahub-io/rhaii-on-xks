@@ -197,6 +197,28 @@ kubectl delete pod -n ${APP_NAMESPACE} -l gateway.istio.io/managed=istio.io-gate
 
 ---
 
+## Known Issues
+
+### Infinite Reconciliation Loop on Vanilla Kubernetes
+
+**Problem:** On vanilla Kubernetes (non-OpenShift), the sail-operator may enter an infinite reconciliation loop where Helm chart revisions increment continuously (~1 every 2 seconds).
+
+**Root Cause:** The sail-operator watches `MutatingWebhookConfiguration` but doesn't filter out `caBundle` field changes. When istiod injects the CA certificate into the sidecar injector webhook, it triggers a reconcile, which runs Helm upgrade, which resets the `caBundle`, creating a loop.
+
+**Fix:** This chart includes a workaround via a postsync hook (`scripts/fix-webhook-loop.sh`) that automatically adds the `sailoperator.io/ignore` annotation to the webhook after deployment.
+
+**If you're already affected** (revisions keep increasing):
+
+```bash
+# Apply the workaround manually
+kubectl annotate mutatingwebhookconfiguration istio-sidecar-injector sailoperator.io/ignore=true --overwrite
+
+# Verify the loop stops
+helm list -n istio-system  # Revision should stop incrementing
+```
+
+---
+
 ## File Structure
 
 ```
@@ -222,5 +244,6 @@ sail-operator-chart/
     ├── cleanup.sh               # Full uninstall
     ├── cleanup-images.sh        # Remove cached images from nodes (uses Eraser)
     ├── copy-pull-secret.sh      # Copy secret to app namespaces
+    ├── fix-webhook-loop.sh      # Workaround for reconciliation loop (postsync hook)
     └── post-install-message.sh  # Prints next steps after helmfile apply
 ```
