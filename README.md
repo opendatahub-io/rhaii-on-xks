@@ -7,7 +7,7 @@ Infrastructure Helm charts for deploying llm-d on xKS platforms (AKS, EKS, GKE).
 | Component | App Version | Description |
 |-----------|-------------|-------------|
 | cert-manager-operator | 1.15.2 | TLS certificate management |
-| sail-operator (Istio) | 3.2.1 | Service mesh & gateway |
+| sail-operator (Istio) | 3.2.1 | Gateway API for inference routing |
 | lws-operator | 1.0 | LeaderWorkerSet controller |
 
 ## Prerequisites
@@ -105,6 +105,33 @@ Operator helmfiles are imported from:
 - https://github.com/aneeshkp/lws-operator-chart
 
 This approach imports the full helmfiles including presync hooks for CRD installation.
+
+## Monitoring (Optional)
+
+Monitoring is **not required** for basic llm-d inference. It is only needed if you:
+- Want to use **Workload Variant Autoscaler (WVA)** - requires Prometheus
+- Want to visualize metrics with **Grafana dashboards**
+
+If you need monitoring, ensure Prometheus is running on your cluster, then enable it in your llm-d `values.yaml`:
+
+```yaml
+inferenceExtension:
+  monitoring:
+    prometheus:
+      enabled: true
+
+prefill:
+  monitoring:
+    podmonitor:
+      enabled: true
+
+decode:
+  monitoring:
+    podmonitor:
+      enabled: true
+```
+
+See [monitoring-stack/](./monitoring-stack/) for details.
 
 ## Next Steps
 

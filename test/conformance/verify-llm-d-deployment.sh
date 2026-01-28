@@ -80,14 +80,19 @@ profile_inference_scheduling_validate() {
     # Check modelservice decode pods
     check_pod_pattern "modelservice-decode" "ModelService Decode"
 
-    # Check inference gateway (matches inference-gateway, gateway-istio, etc.)
-    check_pod_pattern "gateway" "Inference Gateway"
-
     # Check InferencePool CRD and resources
     check_inferencepool
 
-    # Check HTTPRoute if using Gateway API
-    check_httproute
+    # Check HTTPRoute - gateway is only required if using Gateway API
+    local route_count
+    route_count=$($KUBECTL get httproute -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null | wc -l)
+    if [[ "$route_count" -gt 0 ]]; then
+        log_pass "Found $route_count HTTPRoute(s) - using Gateway API"
+        # Gateway required when using HTTPRoutes
+        check_pod_pattern "gateway" "Inference Gateway"
+    else
+        log_info "No HTTPRoute found - using standalone mode (gateway not required)"
+    fi
 }
 
 # -----------------------------------------------------------------------------
@@ -128,9 +133,6 @@ profile_pd_disaggregation_validate() {
     local decode_count
     decode_count=$(check_pod_pattern "modelservice-decode" "ModelService Decode")
 
-    # Check inference gateway (matches inference-gateway, gateway-istio, etc.)
-    check_pod_pattern "gateway" "Inference Gateway"
-
     # Check for deployments that exist but are scaled to 0
     check_deployment_pattern "modelservice-prefill" "ModelService Prefill Deployment"
     check_deployment_pattern "modelservice-decode" "ModelService Decode Deployment"
@@ -142,6 +144,16 @@ profile_pd_disaggregation_validate() {
 
     # Check InferencePool
     check_inferencepool
+
+    # Check HTTPRoute - gateway is only required if using Gateway API
+    local route_count
+    route_count=$($KUBECTL get httproute -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null | wc -l)
+    if [[ "$route_count" -gt 0 ]]; then
+        log_pass "Found $route_count HTTPRoute(s) - using Gateway API"
+        check_pod_pattern "gateway" "Inference Gateway"
+    else
+        log_info "No HTTPRoute found - using standalone mode (gateway not required)"
+    fi
 
     # Check for NIXL/KV transfer configuration (RDMA)
     log_info "Checking for RDMA/NIXL configuration..."
@@ -927,6 +939,7 @@ check_prometheus_targets() {
 }
 
 # Main monitoring check function
+# Only runs if ServiceMonitors/PodMonitors are created by the llm-d deployment
 check_monitoring_stack() {
     log_section "7. Monitoring Stack"
 
@@ -934,6 +947,27 @@ check_monitoring_stack() {
         log_info "Skipping monitoring test (--skip-monitoring)"
         return 0
     fi
+
+    # Check if monitoring is enabled in this deployment (ServiceMonitors/PodMonitors created)
+    local sm_count=0
+    local pm_count=0
+
+    if $KUBECTL get crd servicemonitors.monitoring.coreos.com &>/dev/null; then
+        sm_count=$($KUBECTL get servicemonitor -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]')
+    fi
+
+    if $KUBECTL get crd podmonitors.monitoring.coreos.com &>/dev/null; then
+        pm_count=$($KUBECTL get podmonitor -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]')
+    fi
+
+    if [[ "${sm_count:-0}" -eq 0 ]] && [[ "${pm_count:-0}" -eq 0 ]]; then
+        log_info "No ServiceMonitors/PodMonitors found in $LLMD_NAMESPACE"
+        log_info "Monitoring not enabled in this deployment - skipping monitoring validation"
+        log_info "  Hint: Enable monitoring in llm-d values.yaml if needed for WVA or dashboards"
+        return 0
+    fi
+
+    log_info "Found monitoring resources: $sm_count ServiceMonitor(s), $pm_count PodMonitor(s)"
 
     # Auto-detect monitoring namespace
     auto_detect_monitoring_namespace || true
