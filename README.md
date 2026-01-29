@@ -250,6 +250,6 @@ sail-operator-chart/
     ├── cleanup.sh               # Full uninstall
     ├── cleanup-images.sh        # Remove cached images from nodes (uses Eraser)
     ├── copy-pull-secret.sh      # Copy secret to app namespaces
-    ├── fix-webhook-loop.sh      # Workaround for reconciliation loop (postsync hook)
+    ├── fix-webhook-loop.sh      # Manual workaround for reconciliation loop (backup)
     └── post-install-message.sh  # Prints next steps after helmfile apply
 ```
