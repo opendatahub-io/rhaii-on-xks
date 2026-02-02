@@ -1,7 +1,10 @@
-.PHONY: deploy deploy-all undeploy status test help check-kubeconfig sync
+.PHONY: deploy deploy-all undeploy status test help check-kubeconfig sync clear-cache
 .PHONY: deploy-cert-manager deploy-istio deploy-lws
 .PHONY: undeploy-cert-manager undeploy-istio undeploy-lws
 .PHONY: conformance conformance-basic conformance-full
+
+# Helmfile caches git dependencies - clear to get latest
+HELMFILE_CACHE := $(HOME)/.cache/helmfile
 
 check-kubeconfig:
 	@kubectl cluster-info >/dev/null 2>&1 || (echo "ERROR: Cannot connect to cluster. Check KUBECONFIG." && exit 1)
@@ -28,58 +31,81 @@ help:
 	@echo "  make status              - Show deployment status"
 	@echo "  make test                - Run tests"
 	@echo "  make sync                - Fetch latest from git repos"
+	@echo "  make clear-cache         - Clear helmfile git cache"
 	@echo ""
 	@echo "Conformance Tests:"
 	@echo "  make conformance NAMESPACE=llm-d                    - Run conformance (auto-detect profile)"
 	@echo "  make conformance NAMESPACE=llm-d PROFILE=full       - Run with specific profile"
 	@echo "  make conformance-list                               - List available profiles"
 
+# Clear helmfile git cache to force fresh pulls
+clear-cache:
+	@echo "=== Clearing helmfile cache ==="
+	@rm -rf $(HELMFILE_CACHE)/git 2>/dev/null || true
+	@echo "Cache cleared"
+
 # Sync (fetch latest from git repos)
-sync:
+sync: clear-cache
 	@echo "=== Syncing helm repos ==="
 	helmfile deps
 
 # Deploy cert-manager + istio (default)
-deploy: check-kubeconfig
+deploy: check-kubeconfig clear-cache
 	@echo "=== Deploying cert-manager + istio ==="
 	helmfile apply --selector name=cert-manager-operator
 	helmfile apply --selector name=sail-operator
 	@$(MAKE) status
 
 # Deploy all including lws
-deploy-all: check-kubeconfig
+deploy-all: check-kubeconfig clear-cache
 	@echo "=== Deploying all (cert-manager + istio + lws) ==="
 	helmfile apply
 	@$(MAKE) status
 
 # Deploy individual components
-deploy-cert-manager: check-kubeconfig
+deploy-cert-manager: check-kubeconfig clear-cache
 	@echo "=== Deploying cert-manager ==="
 	helmfile apply --selector name=cert-manager-operator
 
-deploy-istio: check-kubeconfig
+deploy-istio: check-kubeconfig clear-cache
 	@echo "=== Deploying istio ==="
 	helmfile apply --selector name=sail-operator
 
-deploy-lws: check-kubeconfig
+deploy-lws: check-kubeconfig clear-cache
 	@echo "=== Deploying lws ==="
 	helmfile apply --selector name=lws-operator
 
 # Undeploy all
-undeploy: check-kubeconfig
+undeploy: check-kubeconfig clear-cache
 	@echo "=== Removing all ==="
-	helmfile destroy
+	-helmfile destroy || true
+	@echo "=== Cleaning up namespaces ==="
+	-kubectl delete namespace istio-system --ignore-not-found --wait=false
+	-kubectl delete namespace cert-manager --ignore-not-found --wait=false
+	-kubectl delete namespace cert-manager-operator --ignore-not-found --wait=false
+	-kubectl delete namespace openshift-lws-operator --ignore-not-found --wait=false
+	@echo "=== Cleaning up Istio resources ==="
+	-kubectl delete istio --all -A --ignore-not-found 2>/dev/null || true
+	-kubectl delete mutatingwebhookconfiguration istio-sidecar-injector --ignore-not-found 2>/dev/null || true
+	-kubectl delete validatingwebhookconfiguration istio-validator-istio-system --ignore-not-found 2>/dev/null || true
 	@echo "=== Done ==="
 
 # Undeploy individual components
-undeploy-cert-manager: check-kubeconfig
-	helmfile destroy --selector name=cert-manager-operator
+undeploy-cert-manager: check-kubeconfig clear-cache
+	-helmfile destroy --selector name=cert-manager-operator || true
+	-kubectl delete namespace cert-manager --ignore-not-found --wait=false
+	-kubectl delete namespace cert-manager-operator --ignore-not-found --wait=false
 
-undeploy-istio: check-kubeconfig
-	helmfile destroy --selector name=sail-operator
+undeploy-istio: check-kubeconfig clear-cache
+	-helmfile destroy --selector name=sail-operator || true
+	-kubectl delete istio --all -n istio-system --ignore-not-found 2>/dev/null || true
+	-kubectl delete namespace istio-system --ignore-not-found --wait=false
+	-kubectl delete mutatingwebhookconfiguration istio-sidecar-injector --ignore-not-found 2>/dev/null || true
+	-kubectl delete validatingwebhookconfiguration istio-validator-istio-system --ignore-not-found 2>/dev/null || true
 
-undeploy-lws: check-kubeconfig
-	helmfile destroy --selector name=lws-operator
+undeploy-lws: check-kubeconfig clear-cache
+	-helmfile destroy --selector name=lws-operator || true
+	-kubectl delete namespace openshift-lws-operator --ignore-not-found --wait=false
 
 # Status
 status: check-kubeconfig

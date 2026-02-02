@@ -15,27 +15,25 @@ environments:
 ---
 
 # Import operator helmfiles from source repos (includes all hooks)
+# Note: selectorsInherited=true ensures parent --selector flag filters child releases
 helmfiles:
   # cert-manager operator
   - path: git::https://github.com/aneeshkp/cert-manager-operator-chart.git@helmfile.yaml.gotmpl?ref=main
-    selectors:
-      - name=cert-manager-operator
+    selectorsInherited: true
     values:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
   # sail-operator (Istio)
   - path: git::https://github.com/aneeshkp/sail-operator-chart.git@helmfile.yaml.gotmpl?ref=main
-    selectors:
-      - name=sail-operator
+    selectorsInherited: true
     values:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
   # lws-operator
   - path: git::https://github.com/aneeshkp/lws-operator-chart.git@helmfile.yaml.gotmpl?ref=main
-    selectors:
-      - name=lws-operator
+    selectorsInherited: true
     values:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}

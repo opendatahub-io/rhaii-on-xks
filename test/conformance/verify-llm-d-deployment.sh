@@ -4,9 +4,19 @@
 # Validates LLM-D installation based on official deployment guides
 #
 # Usage:
+#   # Upstream llm-d (Helm-based, default)
 #   ./verify-llm-d-deployment.sh --profile inference-scheduling
-#   ./verify-llm-d-deployment.sh --profile pd-disaggregation --namespace llm-d-pd
+#   ./verify-llm-d-deployment.sh --upstream --profile pd-disaggregation --namespace llm-d-pd
+#
+#   # KServe LLMInferenceService (CRD-based)
+#   ./verify-llm-d-deployment.sh --kserve --namespace llm-d-aputtur
+#   ./verify-llm-d-deployment.sh --kserve --profile kserve-pd --namespace llm-d-pd
+#
 #   ./verify-llm-d-deployment.sh --list-profiles
+#
+# Deployment modes:
+#   --upstream (default): Helm-based llm-d deployment via guides
+#   --kserve:             KServe LLMInferenceService CRD-based deployment
 #
 # Profiles match official llm-d guides:
 #   https://github.com/llm-d/llm-d/tree/main/guides
@@ -20,10 +30,17 @@
 set -euo pipefail
 
 # =============================================================================
+# DEPLOYMENT MODE: upstream (Helm) or kserve (CRD)
+# =============================================================================
+
+DEPLOYMENT_MODE="${DEPLOYMENT_MODE:-upstream}"
+
+# =============================================================================
 # AVAILABLE PROFILES (matching official llm-d guides)
 # =============================================================================
 
-AVAILABLE_PROFILES=(
+# Upstream llm-d profiles (Helm-based)
+UPSTREAM_PROFILES=(
     "inference-scheduling"
     "pd-disaggregation"
     "wide-ep-lws"
@@ -32,6 +49,17 @@ AVAILABLE_PROFILES=(
     "simulated-accelerators"
     "quickstart"
 )
+
+# KServe LLMInferenceService profiles
+KSERVE_PROFILES=(
+    "kserve-basic"
+    "kserve-gpu"
+    "kserve-pd"
+    "kserve-scheduler"
+)
+
+# Combined list (set dynamically based on mode)
+AVAILABLE_PROFILES=("${UPSTREAM_PROFILES[@]}")
 
 # =============================================================================
 # PROFILE CONFIGURATIONS
@@ -404,18 +432,208 @@ profile_quickstart_validate() {
 }
 
 # =============================================================================
+# KSERVE LLMINFERENCESERVICE PROFILES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Profile: kserve-basic
+# Basic KServe LLMInferenceService deployment (no scheduler)
+# -----------------------------------------------------------------------------
+profile_kserve_basic_config() {
+    PROFILE_DESCRIPTION="KServe LLMInferenceService - Basic (no scheduler)"
+
+    EXPECTED_POD_PATTERNS="kserve"
+    EXPECTED_DEPLOYMENT_PATTERNS="kserve"
+    EXPECTED_SERVICE_PATTERNS="kserve-workload-svc"
+    EXPECTED_CRDS="llminferenceservices"
+
+    INFERENCE_SERVICE_PATTERN="kserve-workload-svc"
+
+    VALIDATE_LLMISVC="true"
+    VALIDATE_HTTPROUTE="true"
+    VALIDATE_GPU="true"
+}
+
+profile_kserve_basic_validate() {
+    log_info "Running kserve-basic validations..."
+
+    # Check LLMInferenceService CRD
+    check_llminferenceservice_crd
+
+    # Check LLMInferenceService resources
+    check_llminferenceservice_resources
+
+    # Check vLLM pods
+    check_pod_pattern "kserve" "vLLM Pod"
+
+    # Check HTTPRoute
+    check_kserve_httproute
+}
+
+# -----------------------------------------------------------------------------
+# Profile: kserve-gpu
+# KServe LLMInferenceService with GPU and scheduler
+# -----------------------------------------------------------------------------
+profile_kserve_gpu_config() {
+    PROFILE_DESCRIPTION="KServe LLMInferenceService - GPU with Scheduler"
+
+    EXPECTED_POD_PATTERNS="kserve inference-scheduler"
+    EXPECTED_DEPLOYMENT_PATTERNS="kserve"
+    EXPECTED_SERVICE_PATTERNS="kserve-workload-svc"
+    EXPECTED_CRDS="llminferenceservices inferencepool"
+
+    INFERENCE_SERVICE_PATTERN="kserve-workload-svc"
+
+    VALIDATE_LLMISVC="true"
+    VALIDATE_SCHEDULER="true"
+    VALIDATE_INFERENCEPOOL="true"
+    VALIDATE_HTTPROUTE="true"
+    VALIDATE_GPU="true"
+}
+
+profile_kserve_gpu_validate() {
+    log_info "Running kserve-gpu validations..."
+
+    # Check LLMInferenceService CRD
+    check_llminferenceservice_crd
+
+    # Check LLMInferenceService resources
+    check_llminferenceservice_resources
+
+    # Check vLLM pods
+    check_pod_pattern "kserve" "vLLM Pod"
+
+    # Check scheduler pods (EPP)
+    check_pod_pattern "inference-scheduler\|epp" "Scheduler/EPP"
+
+    # Check InferencePool
+    check_inferencepool
+
+    # Check HTTPRoute
+    check_kserve_httproute
+
+    # Check GPU allocation
+    check_gpu_allocation
+}
+
+# -----------------------------------------------------------------------------
+# Profile: kserve-pd
+# KServe LLMInferenceService with Prefill/Decode disaggregation
+# -----------------------------------------------------------------------------
+profile_kserve_pd_config() {
+    PROFILE_DESCRIPTION="KServe LLMInferenceService - Prefill/Decode Disaggregation"
+
+    EXPECTED_POD_PATTERNS="kserve prefill decode"
+    EXPECTED_DEPLOYMENT_PATTERNS="kserve"
+    EXPECTED_SERVICE_PATTERNS="kserve-workload-svc"
+    EXPECTED_CRDS="llminferenceservices inferencepool"
+
+    INFERENCE_SERVICE_PATTERN="kserve-workload-svc"
+
+    VALIDATE_LLMISVC="true"
+    VALIDATE_SCHEDULER="true"
+    VALIDATE_INFERENCEPOOL="true"
+    VALIDATE_HTTPROUTE="true"
+    VALIDATE_PD="true"
+    VALIDATE_GPU="true"
+}
+
+profile_kserve_pd_validate() {
+    log_info "Running kserve-pd validations..."
+
+    # Check LLMInferenceService CRD
+    check_llminferenceservice_crd
+
+    # Check LLMInferenceService resources
+    check_llminferenceservice_resources
+
+    # Check prefill pods
+    local prefill_count
+    prefill_count=$(check_pod_pattern "prefill" "Prefill Pod")
+
+    # Check decode pods
+    local decode_count
+    decode_count=$(check_pod_pattern "decode\|kserve" "Decode Pod")
+
+    # Validate P/D configuration
+    if [[ -n "$prefill_count" ]] && [[ "$prefill_count" != "0" ]]; then
+        log_pass "Prefill/Decode disaggregation detected"
+        log_info "P/D ratio: $prefill_count prefill : $decode_count decode"
+    else
+        log_warn "Prefill pods not found - may be single-pool deployment"
+    fi
+
+    # Check for NIXL/RDMA configuration
+    check_kserve_kv_transfer
+
+    # Check InferencePool
+    check_inferencepool
+
+    # Check HTTPRoute
+    check_kserve_httproute
+}
+
+# -----------------------------------------------------------------------------
+# Profile: kserve-scheduler
+# KServe LLMInferenceService with custom scheduler configuration
+# -----------------------------------------------------------------------------
+profile_kserve_scheduler_config() {
+    PROFILE_DESCRIPTION="KServe LLMInferenceService - Custom Scheduler"
+
+    EXPECTED_POD_PATTERNS="kserve inference-scheduler"
+    EXPECTED_DEPLOYMENT_PATTERNS="kserve"
+    EXPECTED_SERVICE_PATTERNS="kserve-workload-svc"
+    EXPECTED_CRDS="llminferenceservices inferencepool"
+
+    INFERENCE_SERVICE_PATTERN="kserve-workload-svc"
+
+    VALIDATE_LLMISVC="true"
+    VALIDATE_SCHEDULER="true"
+    VALIDATE_INFERENCEPOOL="true"
+    VALIDATE_HTTPROUTE="true"
+    VALIDATE_GPU="true"
+}
+
+profile_kserve_scheduler_validate() {
+    log_info "Running kserve-scheduler validations..."
+
+    # Check LLMInferenceService CRD
+    check_llminferenceservice_crd
+
+    # Check LLMInferenceService resources
+    check_llminferenceservice_resources
+
+    # Check vLLM pods
+    check_pod_pattern "kserve" "vLLM Pod"
+
+    # Check scheduler pods
+    check_pod_pattern "inference-scheduler\|epp" "Scheduler/EPP"
+
+    # Check scheduler configuration
+    check_kserve_scheduler_config
+
+    # Check InferencePool
+    check_inferencepool
+
+    # Check HTTPRoute
+    check_kserve_httproute
+}
+
+# =============================================================================
 # GLOBAL CONFIGURATION
 # =============================================================================
 
 LLMD_NAMESPACE="${LLMD_NAMESPACE:-llm-d}"
+KSERVE_NAMESPACE="${KSERVE_NAMESPACE:-opendatahub}"
 ISTIO_NAMESPACE="${ISTIO_NAMESPACE:-istio-system}"
 MONITORING_NAMESPACE="${MONITORING_NAMESPACE:-monitoring}"
-SELECTED_PROFILE="${PROFILE:-inference-scheduling}"
+SELECTED_PROFILE="${PROFILE:-}"
 MODEL_NAME="${MODEL_NAME:-}"
 TIMEOUT="${TIMEOUT:-120}"
 RETRY_INTERVAL="${RETRY_INTERVAL:-5}"
 SKIP_INFERENCE_TEST="${SKIP_INFERENCE_TEST:-false}"
 SKIP_MONITORING_TEST="${SKIP_MONITORING_TEST:-false}"
+GATEWAY_NAME="${GATEWAY_NAME:-inference-gateway}"
 
 # =============================================================================
 # PARSE COMMAND LINE ARGUMENTS
@@ -423,12 +641,26 @@ SKIP_MONITORING_TEST="${SKIP_MONITORING_TEST:-false}"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --kserve)
+            DEPLOYMENT_MODE="kserve"
+            AVAILABLE_PROFILES=("${KSERVE_PROFILES[@]}")
+            shift
+            ;;
+        --upstream)
+            DEPLOYMENT_MODE="upstream"
+            AVAILABLE_PROFILES=("${UPSTREAM_PROFILES[@]}")
+            shift
+            ;;
         --profile|-p)
             SELECTED_PROFILE="$2"
             shift 2
             ;;
         --namespace|-n)
             LLMD_NAMESPACE="$2"
+            shift 2
+            ;;
+        --kserve-namespace)
+            KSERVE_NAMESPACE="$2"
             shift 2
             ;;
         --timeout|-t)
@@ -452,16 +684,26 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --list-profiles)
-            echo "Available profiles (matching llm-d guides):"
+            echo "Available profiles:"
             echo ""
-            for profile in "${AVAILABLE_PROFILES[@]}"; do
+            echo "Upstream llm-d (Helm-based) - use with --upstream (default):"
+            for profile in "${UPSTREAM_PROFILES[@]}"; do
                 if declare -f "profile_${profile//-/_}_config" > /dev/null; then
                     "profile_${profile//-/_}_config" 2>/dev/null
                     printf "  %-30s %s\n" "$profile" "$PROFILE_DESCRIPTION"
                 fi
             done
             echo ""
-            echo "See: https://github.com/llm-d/llm-d/tree/main/guides"
+            echo "KServe LLMInferenceService (CRD-based) - use with --kserve:"
+            for profile in "${KSERVE_PROFILES[@]}"; do
+                if declare -f "profile_${profile//-/_}_config" > /dev/null; then
+                    "profile_${profile//-/_}_config" 2>/dev/null
+                    printf "  %-30s %s\n" "$profile" "$PROFILE_DESCRIPTION"
+                fi
+            done
+            echo ""
+            echo "Upstream guides: https://github.com/llm-d/llm-d/tree/main/guides"
+            echo "KServe docs:     https://github.com/opendatahub-io/kserve/tree/release-v0.15/docs/samples/llmisvc"
             exit 0
             ;;
         --help|-h)
@@ -470,24 +712,40 @@ LLM-D Conformance Tests
 
 Usage: $0 [OPTIONS]
 
+Deployment Modes:
+  --upstream                  Upstream llm-d (Helm-based) - default
+  --kserve                    KServe LLMInferenceService (CRD-based)
+
 Options:
-  -p, --profile NAME          Deployment profile/guide to validate (default: inference-scheduling)
-  -n, --namespace NAME        LLM-D namespace (default: llm-d)
+  -p, --profile NAME          Deployment profile to validate
+                              Upstream default: inference-scheduling
+                              KServe default: kserve-basic
+  -n, --namespace NAME        Deployment namespace (default: llm-d)
+  --kserve-namespace NS       KServe controller namespace (default: opendatahub)
   -t, --timeout SECONDS       Timeout for wait operations (default: 120)
   -m, --model NAME            Model name for inference test (default: auto-detect)
   --skip-inference            Skip the inference test
   --skip-monitoring           Skip the monitoring stack validation
   --monitoring-namespace NS   Monitoring stack namespace (default: monitoring)
-  --list-profiles             List available profiles
+  --list-profiles             List available profiles for both modes
   -h, --help                  Show this help message
 
 Examples:
-  $0 --profile inference-scheduling --namespace llm-d
+  # Upstream llm-d (Helm-based)
+  $0 --upstream --profile inference-scheduling --namespace llm-d
   $0 --profile pd-disaggregation -n llm-d-pd
-  $0 --profile wide-ep-lws -n llm-d-wide-ep --skip-inference
 
-Profiles match official llm-d guides:
-  https://github.com/llm-d/llm-d/tree/main/guides
+  # KServe LLMInferenceService
+  $0 --kserve --namespace llm-d-aputtur
+  $0 --kserve --profile kserve-pd -n llm-d-pd
+
+Profiles:
+  Upstream: inference-scheduling, pd-disaggregation, wide-ep-lws, etc.
+  KServe:   kserve-basic, kserve-gpu, kserve-pd, kserve-scheduler
+
+Documentation:
+  Upstream: https://github.com/llm-d/llm-d/tree/main/guides
+  KServe:   https://github.com/opendatahub-io/kserve/tree/release-v0.15/docs/samples/llmisvc
 EOF
             exit 0
             ;;
@@ -498,6 +756,15 @@ EOF
             ;;
     esac
 done
+
+# Set default profile based on mode
+if [[ -z "$SELECTED_PROFILE" ]]; then
+    if [[ "$DEPLOYMENT_MODE" == "kserve" ]]; then
+        SELECTED_PROFILE="kserve-basic"
+    else
+        SELECTED_PROFILE="inference-scheduling"
+    fi
+fi
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -539,7 +806,11 @@ load_profile() {
 
     if ! declare -f "$profile_func" > /dev/null; then
         echo "Error: Unknown profile '$profile'"
-        echo "Available profiles: ${AVAILABLE_PROFILES[*]}"
+        if [[ "$DEPLOYMENT_MODE" == "kserve" ]]; then
+            echo "Available KServe profiles: ${KSERVE_PROFILES[*]}"
+        else
+            echo "Available upstream profiles: ${UPSTREAM_PROFILES[*]}"
+        fi
         echo "Run with --list-profiles to see descriptions"
         exit 1
     fi
@@ -636,6 +907,274 @@ check_httproute() {
         log_pass "Found $route_count HTTPRoute(s)"
     else
         log_info "No HTTPRoute found (may use standalone mode)"
+    fi
+}
+
+# =============================================================================
+# KSERVE-SPECIFIC HELPER FUNCTIONS
+# =============================================================================
+
+# Check LLMInferenceService CRD is installed
+check_llminferenceservice_crd() {
+    log_info "Checking LLMInferenceService CRD..."
+
+    if $KUBECTL get crd llminferenceservices.serving.kserve.io &> /dev/null; then
+        log_pass "LLMInferenceService CRD installed"
+        return 0
+    else
+        log_fail "LLMInferenceService CRD not found"
+        log_info "  Hint: Deploy KServe with odh-xks overlay:"
+        log_info "  kustomize build config/overlays/odh-xks | kubectl apply --server-side -f -"
+        return 1
+    fi
+}
+
+# Check LLMInferenceServiceConfig templates exist
+check_llminferenceserviceconfig() {
+    log_info "Checking LLMInferenceServiceConfig templates..."
+
+    local kserve_ns="${KSERVE_NAMESPACE:-opendatahub}"
+    local config_count
+    config_count=$($KUBECTL get llminferenceserviceconfig -n "$kserve_ns" --no-headers 2>/dev/null | wc -l)
+
+    if [[ "$config_count" -gt 0 ]]; then
+        log_pass "Found $config_count LLMInferenceServiceConfig template(s) in $kserve_ns"
+        $KUBECTL get llminferenceserviceconfig -n "$kserve_ns" 2>/dev/null | head -10
+        return 0
+    else
+        log_fail "No LLMInferenceServiceConfig templates found in $kserve_ns"
+        log_info "  Hint: Re-apply odh-xks overlay to create templates"
+        return 1
+    fi
+}
+
+# Check LLMInferenceService resources in namespace
+check_llminferenceservice_resources() {
+    log_info "Checking LLMInferenceService resources..."
+
+    local llmisvc_count
+    llmisvc_count=$($KUBECTL get llminferenceservice -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null | wc -l)
+
+    if [[ "$llmisvc_count" -gt 0 ]]; then
+        log_pass "Found $llmisvc_count LLMInferenceService resource(s)"
+
+        # Show status
+        $KUBECTL get llminferenceservice -n "$LLMD_NAMESPACE" 2>/dev/null
+
+        # Check each one's status
+        local ready_count=0
+        local not_ready=()
+        while IFS= read -r line; do
+            local name ready
+            name=$(echo "$line" | awk '{print $1}')
+            ready=$(echo "$line" | awk '{print $3}')
+            if [[ "$ready" == "True" ]]; then
+                ((ready_count++))
+            else
+                not_ready+=("$name")
+            fi
+        done < <($KUBECTL get llminferenceservice -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null)
+
+        if [[ "$ready_count" -eq "$llmisvc_count" ]]; then
+            log_pass "All $llmisvc_count LLMInferenceService(s) are Ready"
+        else
+            log_warn "$ready_count/$llmisvc_count LLMInferenceService(s) Ready"
+            for name in "${not_ready[@]}"; do
+                log_info "  Not ready: $name"
+                # Show conditions
+                $KUBECTL get llminferenceservice "$name" -n "$LLMD_NAMESPACE" -o jsonpath='{.status.conditions[?(@.status=="False")].message}' 2>/dev/null | head -1
+                echo ""
+            done
+        fi
+        return 0
+    else
+        log_fail "No LLMInferenceService resources found in $LLMD_NAMESPACE"
+        return 1
+    fi
+}
+
+# Check KServe HTTPRoute
+check_kserve_httproute() {
+    log_info "Checking KServe HTTPRoute..."
+
+    local route_count
+    route_count=$($KUBECTL get httproute -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null | wc -l)
+
+    if [[ "$route_count" -gt 0 ]]; then
+        log_pass "Found $route_count HTTPRoute(s)"
+        $KUBECTL get httproute -n "$LLMD_NAMESPACE" 2>/dev/null
+
+        # Check parent gateway
+        local gateway
+        gateway=$($KUBECTL get httproute -n "$LLMD_NAMESPACE" -o jsonpath='{.items[0].spec.parentRefs[0].name}' 2>/dev/null || echo "")
+        local gateway_ns
+        gateway_ns=$($KUBECTL get httproute -n "$LLMD_NAMESPACE" -o jsonpath='{.items[0].spec.parentRefs[0].namespace}' 2>/dev/null || echo "")
+
+        if [[ -n "$gateway" ]]; then
+            log_info "Parent Gateway: $gateway_ns/$gateway"
+
+            # Check gateway status
+            if $KUBECTL get gateway "$gateway" -n "$gateway_ns" &>/dev/null; then
+                local programmed
+                programmed=$($KUBECTL get gateway "$gateway" -n "$gateway_ns" -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}' 2>/dev/null || echo "")
+                if [[ "$programmed" == "True" ]]; then
+                    log_pass "Gateway $gateway is Programmed"
+                else
+                    log_warn "Gateway $gateway is not Programmed"
+                fi
+            else
+                log_fail "Gateway $gateway_ns/$gateway not found"
+            fi
+        fi
+        return 0
+    else
+        log_info "No HTTPRoute found in $LLMD_NAMESPACE"
+        return 0
+    fi
+}
+
+# Check KServe KV transfer configuration (RDMA/NIXL)
+check_kserve_kv_transfer() {
+    log_info "Checking KV transfer configuration..."
+
+    # Check for NIXL configuration
+    local nixl_config
+    nixl_config=$($KUBECTL get pods -n "$LLMD_NAMESPACE" -o jsonpath='{.items[*].spec.containers[*].env[?(@.name=="VLLM_NIXL_SIDE_CHANNEL_HOST")].value}' 2>/dev/null || echo "")
+
+    if [[ -n "$nixl_config" ]]; then
+        log_pass "NIXL KV transfer configured"
+    else
+        # Check for NixlConnector in VLLM_ADDITIONAL_ARGS
+        local nixl_args
+        nixl_args=$($KUBECTL get pods -n "$LLMD_NAMESPACE" -o jsonpath='{.items[*].spec.containers[*].env[?(@.name=="VLLM_ADDITIONAL_ARGS")].value}' 2>/dev/null | grep -i "NixlConnector" || echo "")
+        if [[ -n "$nixl_args" ]]; then
+            log_pass "NixlConnector KV transfer configured in vLLM args"
+        else
+            log_info "NIXL/KV transfer not configured (standard mode)"
+        fi
+    fi
+
+    # Check for RDMA resources
+    local rdma_resources
+    rdma_resources=$($KUBECTL get pods -n "$LLMD_NAMESPACE" -o jsonpath='{.items[*].spec.containers[*].resources.limits}' 2>/dev/null | grep -i "rdma" || echo "")
+    if [[ -n "$rdma_resources" ]]; then
+        log_pass "RDMA resources allocated"
+    fi
+}
+
+# Check KServe scheduler configuration
+check_kserve_scheduler_config() {
+    log_info "Checking scheduler configuration..."
+
+    # Find scheduler pods
+    local scheduler_pods
+    scheduler_pods=$($KUBECTL get pods -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null | grep -E "inference-scheduler|epp" | wc -l)
+
+    if [[ "$scheduler_pods" -gt 0 ]]; then
+        log_pass "Found $scheduler_pods scheduler pod(s)"
+
+        # Check scheduler args for config
+        local scheduler_config
+        scheduler_config=$($KUBECTL get pods -n "$LLMD_NAMESPACE" -l app.kubernetes.io/component=inference-scheduler -o jsonpath='{.items[0].spec.containers[0].args}' 2>/dev/null || echo "")
+
+        if echo "$scheduler_config" | grep -q "config-text"; then
+            log_pass "Custom scheduler config detected"
+        else
+            log_info "Using default scheduler config"
+        fi
+    else
+        log_info "No scheduler pods found (may use k8s service load balancing)"
+    fi
+}
+
+# Check GPU allocation for KServe pods
+check_gpu_allocation() {
+    log_info "Checking GPU allocation..."
+
+    local gpu_pods
+    gpu_pods=$($KUBECTL get pods -n "$LLMD_NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.containers[*].resources.limits.nvidia\.com/gpu}{"\n"}{end}' 2>/dev/null | grep -v "^$" | grep -v " $" || echo "")
+
+    if [[ -n "$gpu_pods" ]]; then
+        local gpu_count
+        gpu_count=$(echo "$gpu_pods" | wc -l)
+        log_pass "Found $gpu_count pod(s) with GPU allocation"
+        echo "$gpu_pods" | while read -r line; do
+            log_info "  $line"
+        done
+    else
+        log_warn "No pods with GPU allocation found"
+    fi
+}
+
+# Check KServe controller
+check_kserve_controller() {
+    log_info "Checking KServe controller..."
+
+    local kserve_ns="${KSERVE_NAMESPACE:-opendatahub}"
+
+    # Check controller pod
+    local controller_pods
+    controller_pods=$($KUBECTL get pods -n "$kserve_ns" -l control-plane=kserve-controller-manager --no-headers 2>/dev/null | wc -l)
+
+    if [[ "$controller_pods" -gt 0 ]]; then
+        local running
+        running=$($KUBECTL get pods -n "$kserve_ns" -l control-plane=kserve-controller-manager --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+        if [[ "$running" -gt 0 ]]; then
+            log_pass "KServe controller: $running pod(s) running in $kserve_ns"
+        else
+            log_fail "KServe controller pods not running"
+            $KUBECTL get pods -n "$kserve_ns" -l control-plane=kserve-controller-manager
+        fi
+    else
+        log_fail "KServe controller not found in $kserve_ns"
+        return 1
+    fi
+}
+
+# Check Gateway with CA bundle (for KServe mTLS)
+check_kserve_gateway() {
+    log_info "Checking KServe Gateway..."
+
+    local kserve_ns="${KSERVE_NAMESPACE:-opendatahub}"
+    local gateway_name="${GATEWAY_NAME:-inference-gateway}"
+
+    # Check gateway exists
+    if ! $KUBECTL get gateway "$gateway_name" -n "$kserve_ns" &>/dev/null; then
+        log_fail "Gateway $gateway_name not found in $kserve_ns"
+        log_info "  Hint: Run ./scripts/setup-gateway.sh to create the gateway"
+        return 1
+    fi
+
+    # Check gateway is programmed
+    local programmed
+    programmed=$($KUBECTL get gateway "$gateway_name" -n "$kserve_ns" -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}' 2>/dev/null || echo "")
+
+    if [[ "$programmed" == "True" ]]; then
+        log_pass "Gateway $gateway_name is Programmed"
+
+        # Get external address
+        local address
+        address=$($KUBECTL get gateway "$gateway_name" -n "$kserve_ns" -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || echo "")
+        if [[ -n "$address" ]]; then
+            log_info "Gateway address: $address"
+        fi
+    else
+        log_warn "Gateway $gateway_name is not Programmed"
+    fi
+
+    # Check gateway pod has CA bundle mounted
+    local gateway_pod
+    gateway_pod=$($KUBECTL get pods -n "$kserve_ns" -l "gateway.networking.k8s.io/gateway-name=$gateway_name" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+    if [[ -n "$gateway_pod" ]]; then
+        local ca_mount
+        ca_mount=$($KUBECTL get pod "$gateway_pod" -n "$kserve_ns" -o jsonpath='{.spec.containers[*].volumeMounts[?(@.mountPath=="/var/run/secrets/opendatahub")].name}' 2>/dev/null || echo "")
+        if [[ -n "$ca_mount" ]]; then
+            log_pass "Gateway pod has CA bundle mounted"
+        else
+            log_warn "Gateway pod missing CA bundle mount at /var/run/secrets/opendatahub"
+            log_info "  Hint: Re-run ./scripts/setup-gateway.sh"
+        fi
     fi
 }
 
@@ -1027,11 +1566,12 @@ auto_detect_inference_service() {
 # Auto-detect model from /v1/models
 auto_detect_model() {
     local base_url="$1"
+    local curl_opts="${2:-}"
 
     log_info "Auto-detecting model from /v1/models..."
 
     local response
-    if response=$(curl -s --max-time 10 "${base_url}/v1/models" 2>/dev/null); then
+    if response=$(curl -s $curl_opts --max-time 10 "${base_url}/v1/models" 2>/dev/null); then
         local model
         model=$(echo "$response" | jq -r '.data[0].id // .models[0].id // .models[0] // empty' 2>/dev/null || echo "")
         if [[ -n "$model" ]]; then
@@ -1338,18 +1878,27 @@ check_inference_readiness() {
         return 0
     fi
 
-    local base_url="http://localhost:$local_port"
+    # Determine protocol - KServe uses HTTPS, upstream uses HTTP
+    local base_url
+    local curl_opts=""
+    if [[ "$DEPLOYMENT_MODE" == "kserve" ]]; then
+        base_url="https://localhost:$local_port"
+        curl_opts="-k"  # Skip certificate verification for self-signed certs
+        log_info "Using HTTPS (KServe mTLS mode)"
+    else
+        base_url="http://localhost:$local_port"
+    fi
 
     # Auto-detect model
     if [[ -z "$MODEL_NAME" ]]; then
-        auto_detect_model "$base_url" || MODEL_NAME="default"
+        auto_detect_model "$base_url" "$curl_opts" || MODEL_NAME="default"
     fi
 
     # Test inference
     log_info "Testing inference with model: $MODEL_NAME"
 
     local response http_code
-    if response=$(curl -s -w "\n%{http_code}" --max-time 60 \
+    if response=$(curl -s $curl_opts -w "\n%{http_code}" --max-time 60 \
         -X POST "${base_url}/v1/completions" \
         -H "Content-Type: application/json" \
         -d "{\"model\":\"$MODEL_NAME\",\"prompt\":\"Hello\",\"max_tokens\":10}" 2>/dev/null); then
@@ -1360,6 +1909,7 @@ check_inference_readiness() {
             log_pass "Inference successful (HTTP 200)"
         else
             log_fail "Inference returned HTTP $http_code"
+            log_info "Response: $(echo "$response" | head -1)"
         fi
     else
         log_fail "Inference request failed"
@@ -1416,15 +1966,23 @@ print_summary() {
 main() {
     echo ""
     echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║         LLM-D Conformance Tests                            ║"
+    if [[ "$DEPLOYMENT_MODE" == "kserve" ]]; then
+        echo "║     KServe LLMInferenceService Conformance Tests           ║"
+    else
+        echo "║         LLM-D Conformance Tests                            ║"
+    fi
     echo "╚════════════════════════════════════════════════════════════╝"
 
     load_profile "$SELECTED_PROFILE"
 
     echo ""
     echo "Configuration:"
+    echo "  Mode:       $DEPLOYMENT_MODE"
     echo "  Profile:    $SELECTED_PROFILE"
     echo "  Namespace:  $LLMD_NAMESPACE"
+    if [[ "$DEPLOYMENT_MODE" == "kserve" ]]; then
+        echo "  KServe NS:  $KSERVE_NAMESPACE"
+    fi
     echo "  Timeout:    ${TIMEOUT}s"
     echo ""
 
@@ -1439,10 +1997,23 @@ main() {
     log_section "1b. Operator Prerequisites"
     check_cert_manager || true
     check_istio || true
-    check_lws_operator || true
+
+    if [[ "$DEPLOYMENT_MODE" == "kserve" ]]; then
+        # KServe-specific checks
+        check_kserve_controller || true
+        check_llminferenceserviceconfig || true
+        check_kserve_gateway || true
+    else
+        # Upstream llm-d checks
+        check_lws_operator || true
+    fi
 
     check_namespace || true
-    check_helm_releases || true
+
+    if [[ "$DEPLOYMENT_MODE" != "kserve" ]]; then
+        check_helm_releases || true
+    fi
+
     check_profile_components || true
     check_inference_readiness || true
     check_monitoring_stack || true
