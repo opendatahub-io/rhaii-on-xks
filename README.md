@@ -102,20 +102,15 @@ make status
 ### Step 2: Deploy KServe
 
 ```bash
-# Clone KServe repo
-git clone https://github.com/opendatahub-io/kserve.git
-cd kserve
-git checkout release-v0.15
-
 # Create opendatahub namespace
 kubectl create namespace opendatahub --dry-run=client -o yaml | kubectl apply -f -
 
 # Apply cert-manager PKI resources first (required for webhook certificates)
-kubectl apply -k config/overlays/odh-xks/cert-manager
+kubectl apply -k "https://github.com/opendatahub-io/kserve/config/overlays/odh-test/cert-manager?ref=release-v0.15"
 kubectl wait --for=condition=Ready clusterissuer/opendatahub-ca-issuer --timeout=120s
 
 # Deploy KServe with odh-xks overlay
-kustomize build config/overlays/odh-xks | kubectl apply --server-side -f -
+kustomize build "https://github.com/opendatahub-io/kserve/config/overlays/odh-xks?ref=release-v0.15" | kubectl apply --server-side --force-conflicts -f -
 
 # Wait for controller to be ready
 kubectl wait --for=condition=Available deployment/kserve-controller-manager -n opendatahub --timeout=300s
@@ -133,7 +128,88 @@ cd /path/to/llm-d-infra-xks
 
 ### Step 4: Deploy LLMInferenceService
 
-See [Deploying LLMInferenceService](#deploying-llminferenceservice) below.
+#### Hardware Requirements
+
+| Resource | Per Replica | Notes |
+|----------|-------------|-------|
+| GPU | 1x NVIDIA GPU | A10, A100, H100, or similar |
+| CPU | 2-4 cores | |
+| Memory | 16-32 Gi | Depends on model size |
+
+#### Node Requirements (AKS/EKS/GKE)
+
+Ensure your cluster has GPU nodes with the NVIDIA device plugin installed:
+
+```bash
+# Verify GPU nodes are available
+kubectl get nodes -l nvidia.com/gpu.present=true
+
+# Check GPU resources
+kubectl describe nodes | grep -A5 "nvidia.com/gpu"
+```
+
+For AKS, create a GPU node pool:
+```bash
+az aks nodepool add \
+  --resource-group <rg> \
+  --cluster-name <cluster> \
+  --name gpunp \
+  --node-count 2 \
+  --node-vm-size Standard_NC24ads_A100_v4 \
+  --node-taints sku=gpu:NoSchedule \
+  --labels nvidia.com/gpu.present=true
+```
+
+#### Deploy Sample Model
+
+```bash
+# Create namespace first
+export NAMESPACE=llm-d-test
+kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+# Deploy Qwen2.5-7B model with scheduler
+kubectl apply -n $NAMESPACE -f - <<'EOF'
+apiVersion: serving.kserve.io/v1alpha1
+kind: LLMInferenceService
+metadata:
+  name: qwen2-7b-instruct
+spec:
+  model:
+    name: Qwen/Qwen2.5-7B-Instruct
+    uri: hf://Qwen/Qwen2.5-7B-Instruct
+  replicas: 1
+  router:
+    gateway: {}
+    route: {}
+    scheduler: {}   # Enable EPP scheduler for intelligent routing
+  template:
+    containers:
+    - name: main
+      resources:
+        limits:
+          cpu: "4"
+          memory: 32Gi
+          nvidia.com/gpu: "1"
+        requests:
+          cpu: "2"
+          memory: 16Gi
+          nvidia.com/gpu: "1"
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+          scheme: HTTPS
+        initialDelaySeconds: 120
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 5
+EOF
+
+# Watch deployment status
+kubectl get llmisvc -n $NAMESPACE -w
+```
+
+See [Deploying LLMInferenceService](#deploying-llminferenceservice) below for more details.
 
 ---
 
@@ -242,29 +318,14 @@ kubectl get gateway -n opendatahub
 kubectl get pods -n opendatahub -l gateway.networking.k8s.io/gateway-name=inference-gateway
 ```
 
-### Set up Namespace with Pull Secret
-
-**Important:** vLLM images are from `registry.redhat.io` which requires a Red Hat pull secret.
+### Set up Namespace
 
 ```bash
 export NAMESPACE=llm-test
-kubectl create namespace $NAMESPACE
-
-# Create pull secret from downloaded auth file
-kubectl create secret generic redhat-pull-secret \
-  --type=kubernetes.io/dockerconfigjson \
-  --from-file=.dockerconfigjson=/path/to/your-auth.json \
-  -n $NAMESPACE
-
-# Add to default ServiceAccount (all pods in namespace will use it)
-kubectl patch serviceaccount default -n $NAMESPACE \
-  -p '{"imagePullSecrets": [{"name": "redhat-pull-secret"}]}'
-
-# Create HuggingFace token secret (for gated models)
-kubectl create secret generic hf-token \
-  --from-literal=HF_TOKEN=<your-huggingface-token> \
-  -n $NAMESPACE
+kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 ```
+
+> **Note:** KServe automatically handles pull secrets and HuggingFace tokens through LLMInferenceServiceConfig.
 
 ### Sample: Deploy Qwen2.5-7B with Scheduler
 
@@ -304,8 +365,6 @@ spec:
           periodSeconds: 30
           timeoutSeconds: 30
           failureThreshold: 5
-    imagePullSecrets:
-    - name: redhat-pull-secret
 EOF
 ```
 
@@ -358,17 +417,17 @@ See the [KServe samples](https://github.com/opendatahub-io/kserve/tree/release-v
 If the controller pod is stuck in `ContainerCreating` (waiting for certificate):
 ```bash
 # Apply cert-manager resources separately first
-kubectl apply -k config/overlays/odh-xks/cert-manager
+kubectl apply -k "https://github.com/opendatahub-io/kserve/config/overlays/odh-test/cert-manager?ref=release-v0.15"
 kubectl wait --for=condition=Ready certificate/kserve-webhook-server -n opendatahub --timeout=120s
 
 # Then re-apply the overlay
-kustomize build config/overlays/odh-xks | kubectl apply --server-side -f -
+kustomize build "https://github.com/opendatahub-io/kserve/config/overlays/odh-xks?ref=release-v0.15" | kubectl apply --server-side --force-conflicts -f -
 ```
 
 If webhook validation blocks apply:
 ```bash
 kubectl delete validatingwebhookconfiguration llminferenceservice.serving.kserve.io llminferenceserviceconfig.serving.kserve.io
-kustomize build config/overlays/odh-xks | kubectl apply --server-side --force-conflicts -f -
+kustomize build "https://github.com/opendatahub-io/kserve/config/overlays/odh-xks?ref=release-v0.15" | kubectl apply --server-side --force-conflicts -f -
 ```
 
 ### Gateway Issues
