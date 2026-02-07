@@ -5,11 +5,11 @@ namespace: istio-system
 
 bundle:
   source: redhat        # "redhat" or "konflux"
-  version: "3.1.4"
+  version: "3.2.1"
 
 # Istio version to deploy (must match bundle version)
-# OSSM 3.1.x -> v1.26.x, OSSM 3.2.x -> v1.27.x
-istioVersion: "v1.26.6"
+# OSSM 3.1.x -> v1.26.x, OSSM 3.2.x -> v1.27.x, OSSM 3.3.x -> v1.28.x
+istioVersion: "v1.27.5"
 
 pullSecret:
   name: redhat-pull-secret

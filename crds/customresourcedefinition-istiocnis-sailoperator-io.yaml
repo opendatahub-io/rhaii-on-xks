@@ -65,7 +65,7 @@ spec:
             spec:
               default:
                 namespace: istio-cni
-                version: v1.26.6
+                version: v1.27.3
               description: IstioCNISpec defines the desired state of IstioCNI
               properties:
                 namespace:
@@ -1009,6 +1009,18 @@ spec:
                             The directory path within the cluster node's filesystem where network namespaces are located.
                             Defaults to '/var/run/netns', in minikube/docker/others can be '/var/run/docker/netns'.
                           type: string
+                        env:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            Environment variables passed to the CNI container.
+
+                            Examples:
+                            env:
+
+                            	ENV_VAR_1: value1
+                            	ENV_VAR_2: value2
+                          type: object
                         excludeNamespaces:
                           description: List of namespaces that should be ignored by the CNI plugin.
                           items:
@@ -1021,6 +1033,11 @@ spec:
                           description: |-
                             Image name to pull from. Image will be `Hub/Image:Tag-Variant`.
                             If Image contains a "/", it will replace the entire `image` in the pod.
+                          type: string
+                        istioOwnedCNIConfig:
+                          description: Specifies if an Istio owned CNI config should be created.
+                          type: boolean
+                        istioOwnedCNIConfigFileName:
                           type: string
                         logging:
                           description: Same as `global.logging.level`, but will override it if set
@@ -1335,6 +1352,9 @@ spec:
                                 If empty, default scope and level will be used as configured in code
                               type: string
                           type: object
+                        nativeNftables:
+                          description: Specifies whether native nftables rules should be used instead of iptables rules for traffic redirection.
+                          type: boolean
                         platform:
                           description: |-
                             Platform in which Istio is deployed. Possible values are: "openshift" and "gcp"
@@ -1350,11 +1370,13 @@ spec:
                       type: object
                   type: object
                 version:
-                  default: v1.26.6
+                  default: v1.27.3
                   description: |-
                     Defines the version of Istio to install.
-                    Must be one of: v1.26-latest, v1.26.6, v1.26.4, v1.26.3, v1.26.2, v1.24-latest, v1.24.6, v1.24.5, v1.24.4, v1.24.3.
+                    Must be one of: v1.27-latest, v1.27.3, v1.26-latest, v1.26.6, v1.26.4, v1.26.3, v1.26.2, v1.24-latest, v1.24.6, v1.24.5, v1.24.4, v1.24.3.
                   enum:
+                    - v1.27-latest
+                    - v1.27.3
                     - v1.26-latest
                     - v1.26.6
                     - v1.26.4
