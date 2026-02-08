@@ -14,30 +14,25 @@ environments:
 
 ---
 
-# Import operator helmfiles
-# For testing: use local paths
-# For production: use git:: URLs with branches (release-3.1 for v1alpha2, main for v1)
+# Import operator helmfiles from GitHub
 # Note: selectorsInherited=true ensures parent --selector flag filters child releases
 helmfiles:
   # cert-manager operator
-  - path: ../cert-manager-operator-chart/helmfile.yaml.gotmpl
-    # Production: git::https://github.com/aneeshkp/cert-manager-operator-chart.git@helmfile.yaml.gotmpl?ref=main
+  - path: git::https://github.com/aneeshkp/cert-manager-operator-chart.git@helmfile.yaml.gotmpl?ref=main
     selectorsInherited: true
     values:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
   # sail-operator (Istio) - using release-3.1 for v1alpha2 stack
-  - path: ../sail-operator-chart/helmfile.yaml.gotmpl
-    # Production: git::https://github.com/aneeshkp/sail-operator-chart.git@helmfile.yaml.gotmpl?ref=release-3.1
+  - path: git::https://github.com/aneeshkp/sail-operator-chart.git@helmfile.yaml.gotmpl?ref=release-3.1
     selectorsInherited: true
     values:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
   # lws-operator
-  - path: ../lws-operator-chart/helmfile.yaml.gotmpl
-    # Production: git::https://github.com/aneeshkp/lws-operator-chart.git@helmfile.yaml.gotmpl?ref=main
+  - path: git::https://github.com/aneeshkp/lws-operator-chart.git@helmfile.yaml.gotmpl?ref=main
     selectorsInherited: true
     values:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
