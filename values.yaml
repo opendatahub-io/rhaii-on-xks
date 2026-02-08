@@ -9,7 +9,7 @@ bundle:
 
 # Istio version to deploy (must match bundle version)
 # OSSM 3.1.x -> v1.26.x, OSSM 3.2.x -> v1.27.x, OSSM 3.3.x -> v1.28.x
-istioVersion: "v1.27.5"
+istioVersion: "v1.27-latest"
 
 pullSecret:
   name: redhat-pull-secret
