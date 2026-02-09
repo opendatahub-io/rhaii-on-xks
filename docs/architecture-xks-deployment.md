@@ -2,9 +2,9 @@
 
 ## Context
 
-**Goal:** Deploy llm-d (LLM distributed inference) on xKS platforms (AKS, EKS, GKE, CoreWeave) for EA1 delivery.
+**Goal:** Deploy Red Hat AI Inference Server (LLMInferenceService) on xKS platforms (AKS, CoreWeave) for EA1 delivery.
 
-**Challenge:** llm-d requires Red Hat-supported operators (cert-manager, sail-operator, lws-operator) that are normally deployed via OLM (Operator Lifecycle Manager) on OpenShift. OLM is not available on vanilla Kubernetes.
+**Challenge:** LLMInferenceService requires Red Hat-supported operators (cert-manager, sail-operator, lws-operator) that are normally deployed via OLM (Operator Lifecycle Manager) on OpenShift. OLM is not available on vanilla Kubernetes.
 
 **Solution:** Extract operator manifests from OLM bundles and deploy using Helm/Helmfile.
 
@@ -24,8 +24,8 @@
 
 ## Why Helm Charts?
 
-| On OpenShift | On xKS (AKS/EKS/GKE) |
-|--------------|----------------------|
+| On OpenShift | On xKS (AKS/CKS) |
+|--------------|------------------|
 | OLM manages operator lifecycle | No OLM available |
 | `Subscription` CR triggers install | Need alternative deployment method |
 | Automatic upgrades via OLM | Manual upgrades via Helm |
@@ -171,15 +171,19 @@ kubectl annotate mutatingwebhookconfiguration istio-sidecar-injector \
 
 ### For EA1 Delivery
 
-1. Customer provisions xKS cluster (AKS/EKS/GKE)
+1. Customer provisions xKS cluster (AKS or CoreWeave)
 2. Customer obtains Red Hat pull secret
 3. Deploy infrastructure:
    ```bash
-   git clone https://github.com/redhat/llm-d-infra-xks
+   git clone https://github.com/aneeshkp/llm-d-infra-xks
    cd llm-d-infra-xks
-   make deploy
+   make deploy-all
    ```
-4. Deploy llm-d using standard guides
+4. Deploy KServe controller:
+   ```bash
+   make deploy-kserve
+   ```
+5. Set up Gateway and deploy LLMInferenceService (see [Deployment Guide](./deploying-llm-d-on-managed-kubernetes.md))
 
 ### Upgrade Path
 
@@ -204,4 +208,4 @@ make deploy
 - **What:** Deploy Red Hat operators on xKS without OLM
 - **How:** Extract OLM bundles → Helm charts via olm-extractor
 - **Why:** Red Hat support + no OLM on vanilla K8s
-- **Result:** llm-d runs on AKS, EKS, GKE, CoreWeave with supported components
+- **Result:** LLMInferenceService runs on AKS and CoreWeave with supported components

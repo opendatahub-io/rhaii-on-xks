@@ -38,7 +38,19 @@ GATEWAY_NAME=inference-gateway \
 
 ## Manual Setup
 
-### Step 1: Extract CA and Create ConfigMap
+### Step 1: Copy Pull Secret
+
+The Gateway pod needs to pull Istio images from `registry.redhat.io`:
+
+```bash
+# Copy pull secret to opendatahub namespace
+kubectl delete secret redhat-pull-secret -n opendatahub --ignore-not-found
+kubectl get secret redhat-pull-secret -n istio-system -o json | \
+  jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations, .metadata.labels) | .metadata.namespace = "opendatahub"' | \
+  kubectl create -f -
+```
+
+### Step 2: Extract CA and Create ConfigMap
 
 ```bash
 # Extract CA certificate from cert-manager secret
@@ -59,7 +71,7 @@ kubectl create configmap odh-ca-bundle \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-### Step 2: Create Gateway Configuration ConfigMap
+### Step 3: Create Gateway Configuration ConfigMap
 
 This configures the Gateway pod to mount the CA bundle at the path expected by
 LLM workloads (`/var/run/secrets/opendatahub/ca.crt`).
@@ -89,7 +101,7 @@ data:
 EOF
 ```
 
-### Step 3: Create the Gateway
+### Step 4: Create the Gateway
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -117,7 +129,25 @@ spec:
 EOF
 ```
 
-### Step 4: Verify
+### Step 5: Patch ServiceAccount and Restart Pod
+
+The Gateway ServiceAccount needs the pull secret to pull Istio images:
+
+```bash
+# Patch ServiceAccount with pull secret
+kubectl patch serviceaccount inference-gateway-istio -n opendatahub \
+  -p '{"imagePullSecrets": [{"name": "redhat-pull-secret"}]}'
+
+# Delete the pod to restart with pull secret
+kubectl delete pod -n opendatahub -l gateway.networking.k8s.io/gateway-name=inference-gateway
+
+# Wait for pod to be ready
+kubectl wait --for=condition=Ready pod \
+  -l gateway.networking.k8s.io/gateway-name=inference-gateway \
+  -n opendatahub --timeout=120s
+```
+
+### Step 6: Verify
 
 ```bash
 # Check Gateway is programmed
@@ -173,6 +203,25 @@ kubectl get gateway inference-gateway -n opendatahub
 | `CA_MOUNT_PATH` | `/var/run/secrets/opendatahub` | Mount path for CA bundle |
 
 ## Troubleshooting
+
+### Gateway pod shows ErrImagePull
+
+The Gateway pod needs to pull Istio images from `registry.redhat.io`:
+
+```bash
+# Copy pull secret to opendatahub namespace
+kubectl delete secret redhat-pull-secret -n opendatahub --ignore-not-found
+kubectl get secret redhat-pull-secret -n istio-system -o json | \
+  jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations, .metadata.labels) | .metadata.namespace = "opendatahub"' | \
+  kubectl create -f -
+
+# Patch ServiceAccount
+kubectl patch sa inference-gateway-istio -n opendatahub \
+  -p '{"imagePullSecrets": [{"name": "redhat-pull-secret"}]}'
+
+# Restart the pod
+kubectl delete pod -n opendatahub -l gateway.networking.k8s.io/gateway-name=inference-gateway
+```
 
 ### Gateway not becoming Programmed
 

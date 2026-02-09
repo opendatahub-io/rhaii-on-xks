@@ -1,4 +1,4 @@
-# LLM-D Monitoring on AKS
+# Monitoring on AKS
 
 ## Prerequisites
 
@@ -11,7 +11,7 @@
 
 Choose one:
 
-### Option 1: Self-hosted kube-prometheus-stack
+### Option 1: Self-hosted kube-prometheus-stack (Recommended)
 
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -27,7 +27,7 @@ CRDs are included automatically.
 
 ### Option 2: Azure Managed Prometheus
 
-1. Enable in Azure Portal: AKS cluster → Monitoring → Enable Managed Prometheus
+1. Enable in Azure Portal: AKS cluster > Monitoring > Enable Managed Prometheus
 2. Install CRDs separately:
    ```bash
    helm install prometheus-operator-crds prometheus-community/prometheus-operator-crds
@@ -47,30 +47,37 @@ kubectl get pods -n monitoring | grep prometheus
 kubectl get pods -n kube-system | grep ama-metrics
 ```
 
-## Enable Monitoring in llm-d
+## Enable Monitoring in KServe
 
-```yaml
-# llm-d values.yaml
-inferenceExtension:
-  monitoring:
-    prometheus:
-      enabled: true
+By default, monitoring is disabled. Enable it:
 
-prefill:
-  monitoring:
-    podmonitor:
-      enabled: true
-
-decode:
-  monitoring:
-    podmonitor:
-      enabled: true
+```bash
+kubectl set env deployment/kserve-controller-manager \
+  -n opendatahub \
+  LLMISVC_MONITORING_DISABLED=false
 ```
 
-The helm chart creates ServiceMonitors/PodMonitors automatically.
+KServe automatically creates `PodMonitor` resources for vLLM pods when LLMInferenceService is deployed.
 
 ## Verify
 
 ```bash
-kubectl get servicemonitors,podmonitors -n <llm-d-namespace>
+# Check PodMonitors created by KServe
+kubectl get podmonitors -n <llmisvc-namespace>
+
+# Check targets in Prometheus
+kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
+# Open http://localhost:9090/targets
 ```
+
+## Access Grafana (Self-hosted only)
+
+```bash
+# Port forward
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+
+# Get password
+kubectl get secret -n monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d
+```
+
+Open http://localhost:3000 (user: admin)

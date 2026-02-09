@@ -27,8 +27,9 @@ This guide provides step-by-step instructions for deploying Red Hat AI Inference
 5. [Configuring the Inference Gateway](#5-configuring-the-inference-gateway)
 6. [Deploying an LLM Inference Service](#6-deploying-an-llm-inference-service)
 7. [Verifying the Deployment](#7-verifying-the-deployment)
-8. [Troubleshooting](#8-troubleshooting)
-9. [Appendix: Component Versions](#appendix-component-versions)
+8. [Optional: Enabling Monitoring](#8-optional-enabling-monitoring)
+9. [Troubleshooting](#9-troubleshooting)
+10. [Appendix: Component Versions](#appendix-component-versions)
 
 ---
 
@@ -404,9 +405,38 @@ curl -X POST "${SERVICE_URL}/v1/chat/completions" \
 
 ---
 
-## 8. Troubleshooting
+## 8. Optional: Enabling Monitoring
 
-### 8.1 Controller Pod Stuck in ContainerCreating
+Monitoring is disabled by default. Enable it if you need:
+- Grafana dashboards for inference metrics
+- Workload Variant Autoscaler (WVA) for auto-scaling
+
+### 8.1 Prerequisites
+
+Install Prometheus with ServiceMonitor/PodMonitor CRD support. See the [Monitoring Setup Guide](../monitoring-stack/) for platform-specific instructions.
+
+### 8.2 Enable Monitoring in KServe
+
+```bash
+kubectl set env deployment/kserve-controller-manager \
+  -n opendatahub \
+  LLMISVC_MONITORING_DISABLED=false
+```
+
+When enabled, KServe automatically creates `PodMonitor` resources for vLLM pods.
+
+### 8.3 Verify
+
+```bash
+# Check PodMonitors created by KServe
+kubectl get podmonitors -n <llmisvc-namespace>
+```
+
+---
+
+## 9. Troubleshooting
+
+### 9.1 Controller Pod Stuck in ContainerCreating
 
 **Symptom:** The `kserve-controller-manager` pod remains in `ContainerCreating` state.
 
@@ -419,7 +449,7 @@ kubectl apply -k "https://github.com/opendatahub-io/kserve/config/overlays/odh-t
 kubectl wait --for=condition=Ready certificate/kserve-webhook-server -n opendatahub --timeout=120s
 ```
 
-### 8.2 Gateway Pod Shows ErrImagePull
+### 9.2 Gateway Pod Shows ErrImagePull
 
 **Symptom:** The Gateway pod fails with `ErrImagePull` or `ImagePullBackOff`.
 
@@ -438,7 +468,7 @@ kubectl patch sa inference-gateway-istio -n opendatahub \
 kubectl delete pod -n opendatahub -l gateway.networking.k8s.io/gateway-name=inference-gateway
 ```
 
-### 8.3 LLMInferenceService Pod Shows FailedScheduling
+### 9.3 LLMInferenceService Pod Shows FailedScheduling
 
 **Symptom:** The inference pod shows `FailedScheduling` with message "Insufficient nvidia.com/gpu".
 
@@ -458,7 +488,7 @@ kubectl delete pod -n opendatahub -l gateway.networking.k8s.io/gateway-name=infe
 
 3. Add matching tolerations to the LLMInferenceService spec (see Section 6.3).
 
-### 8.4 Webhook Validation Errors During Deployment
+### 9.4 Webhook Validation Errors During Deployment
 
 **Symptom:** Deployment fails with "no endpoints available for service" webhook errors.
 
@@ -504,6 +534,7 @@ make deploy-kserve
 For assistance with Red Hat AI Inference Server deployments, contact Red Hat Support or consult the product documentation.
 
 **Additional Resources:**
+- [Monitoring Setup Guide](../monitoring-stack/) - Optional Prometheus/Grafana configuration for dashboards and autoscaling
 - [KServe LLMInferenceService Samples](https://github.com/opendatahub-io/kserve/tree/main/docs/samples/llmisvc)
 - [Gateway API Documentation](https://gateway-api.sigs.k8s.io/)
 - [Istio Documentation](https://istio.io/latest/docs/)
