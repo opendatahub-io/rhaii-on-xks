@@ -24,8 +24,8 @@ helmfiles:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
-  # sail-operator (Istio) - using release-3.1 for v1alpha2 stack
-  - path: git::https://github.com/aneeshkp/sail-operator-chart.git@helmfile.yaml.gotmpl?ref=release-3.1
+  # sail-operator (Istio) - OSSM 3.2.x / Istio 1.27+ with v1 InferencePool API
+  - path: git::https://github.com/aneeshkp/sail-operator-chart.git@helmfile.yaml.gotmpl?ref=main
     selectorsInherited: true
     values:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}

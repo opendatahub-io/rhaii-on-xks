@@ -7,18 +7,17 @@ Infrastructure Helm charts for deploying KServe LLMInferenceService on xKS platf
 | Component | App Version | Description |
 |-----------|-------------|-------------|
 | cert-manager-operator | 1.15.2 | TLS certificate management |
-| sail-operator (Istio) | 3.1.x / 3.2.x | Gateway API for inference routing |
+| sail-operator (Istio) | 3.2.x | Gateway API for inference routing |
 | lws-operator | 1.0 | LeaderWorkerSet controller for multi-node workloads |
 
 ### Version Compatibility
 
-| Stack | Sail Branch | OSSM | Istio | InferencePool API | KServe Branch | Status |
-|-------|-------------|------|-------|-------------------|---------------|--------|
-| **v1alpha2** | `release-3.1` | 3.1.x | v1.26.x | `inference.networking.x-k8s.io/v1alpha2` | `release-v0.15` | **Working** |
-| v1 | `main` | 3.2.x | v1.27.x | `inference.networking.k8s.io/v1` | `master` | Pending (no odh-xks) |
-
-> **Current Status:** Use the **v1alpha2 stack** (`release-3.1` + `release-v0.15`) for production.
-> The v1 stack requires KServe `master` to merge the `odh-xks` overlay (currently only in `release-v0.15`).
+| Component | Version | Notes |
+|-----------|---------|-------|
+| OSSM (Sail Operator) | 3.2.x | Gateway API for inference routing |
+| Istio | v1.27.x | Service mesh |
+| InferencePool API | v1 | `inference.networking.k8s.io/v1` |
+| KServe | release-v0.15 | LLMInferenceService controller |
 
 ## Prerequisites
 
@@ -419,9 +418,9 @@ kubectl delete pod -n opendatahub -l gateway.networking.k8s.io/gateway-name=infe
 
 ---
 
-## Upgrading OSSM/Istio Version
+## Reinstalling Istio
 
-When changing OSSM versions (e.g., 3.1.x to 3.2.x), do a clean upgrade to avoid stale resources:
+If you need to do a clean reinstall of Istio:
 
 ```bash
 # 1. Delete the Istio CR (triggers istiod cleanup)
@@ -430,29 +429,8 @@ kubectl delete istio default -n istio-system
 # 2. Wait for istiod to be removed
 kubectl wait --for=delete pod -l app=istiod -n istio-system --timeout=120s
 
-# 3. Delete problematic CRDs (if switching major versions)
-kubectl delete crd ztunnels.sailoperator.io --ignore-not-found
-
-# 4. Redeploy with latest charts
+# 3. Redeploy
 make deploy-istio
-```
-
-> **Note:** The sail-operator-chart is pulled from GitHub with the branch configured in helmfile.yaml.gotmpl.
-> Current default: `release-3.1` branch (OSSM 3.1.x / Istio v1.26.x / v1alpha2 InferencePool)
-
-### Upgrading to v1 InferencePool API (Future)
-
-When KServe `master` branch includes the `odh-xks` overlay, upgrade to v1 API:
-
-Edit `helmfile.yaml.gotmpl`:
-```yaml
-# Upgrade to OSSM 3.2.x for v1 InferencePool
-- path: git::https://github.com/aneeshkp/sail-operator-chart.git@helmfile.yaml.gotmpl?ref=main
-```
-
-And update `KSERVE_REF` in Makefile:
-```makefile
-KSERVE_REF ?= master
 ```
 
 ---
