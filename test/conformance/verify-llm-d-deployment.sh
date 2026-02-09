@@ -504,7 +504,7 @@ profile_kserve_gpu_validate() {
     check_pod_pattern "kserve" "vLLM Pod"
 
     # Check scheduler pods (EPP)
-    check_pod_pattern "inference-scheduler\|epp" "Scheduler/EPP"
+    check_pod_pattern "inference-scheduler\|epp\|router-scheduler" "Scheduler/EPP"
 
     # Check InferencePool
     check_inferencepool
@@ -607,7 +607,7 @@ profile_kserve_scheduler_validate() {
     check_pod_pattern "kserve" "vLLM Pod"
 
     # Check scheduler pods
-    check_pod_pattern "inference-scheduler\|epp" "Scheduler/EPP"
+    check_pod_pattern "inference-scheduler\|epp\|router-scheduler" "Scheduler/EPP"
 
     # Check scheduler configuration
     check_kserve_scheduler_config
@@ -1068,7 +1068,7 @@ check_kserve_scheduler_config() {
 
     # Find scheduler pods
     local scheduler_pods
-    scheduler_pods=$($KUBECTL get pods -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null | grep -E "inference-scheduler|epp" | wc -l)
+    scheduler_pods=$($KUBECTL get pods -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null | grep -E "inference-scheduler|epp|router-scheduler" | wc -l)
 
     if [[ "$scheduler_pods" -gt 0 ]]; then
         log_pass "Found $scheduler_pods scheduler pod(s)"
@@ -1152,11 +1152,32 @@ check_kserve_gateway() {
     if [[ "$programmed" == "True" ]]; then
         log_pass "Gateway $gateway_name is Programmed"
 
-        # Get external address
-        local address
+        # Get external address and detect protocol
+        local address protocol port curl_tls_opt=""
         address=$($KUBECTL get gateway "$gateway_name" -n "$kserve_ns" -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || echo "")
+        protocol=$($KUBECTL get gateway "$gateway_name" -n "$kserve_ns" -o jsonpath='{.spec.listeners[0].protocol}' 2>/dev/null || echo "HTTP")
+        port=$($KUBECTL get gateway "$gateway_name" -n "$kserve_ns" -o jsonpath='{.spec.listeners[0].port}' 2>/dev/null || echo "80")
+
         if [[ -n "$address" ]]; then
+            local scheme="http"
+            if [[ "$protocol" == "HTTPS" ]]; then
+                scheme="https"
+                curl_tls_opt="-k "
+            fi
+
+            # Include port if non-standard
+            local url_port=""
+            if [[ "$port" != "80" && "$port" != "443" ]]; then
+                url_port=":${port}"
+            fi
+
             log_info "Gateway address: $address"
+            log_info "External URL: ${scheme}://${address}${url_port}"
+            log_info "To test externally:"
+            echo "  curl ${curl_tls_opt}-X POST '${scheme}://${address}${url_port}/v1/completions' \\"
+            echo "    -H 'Content-Type: application/json' \\"
+            echo "    -d '{\"model\":\"MODEL_NAME\",\"prompt\":\"Hello\",\"max_tokens\":10}'"
+            echo ""
         fi
     else
         log_warn "Gateway $gateway_name is not Programmed"
@@ -1502,7 +1523,7 @@ check_monitoring_stack() {
     if [[ "${sm_count:-0}" -eq 0 ]] && [[ "${pm_count:-0}" -eq 0 ]]; then
         log_info "No ServiceMonitors/PodMonitors found in $LLMD_NAMESPACE"
         log_info "Monitoring not enabled in this deployment - skipping monitoring validation"
-        log_info "  Hint: Enable monitoring in llm-d values.yaml if needed for WVA or dashboards"
+        log_info "  Hint: Enable monitoring with: kubectl set env deployment/kserve-controller-manager -n opendatahub LLMISVC_MONITORING_DISABLED=false"
         return 0
     fi
 
@@ -1896,6 +1917,13 @@ check_inference_readiness() {
 
     # Test inference
     log_info "Testing inference with model: $MODEL_NAME"
+
+    # Print the curl command so user can try it manually
+    log_info "To test manually, run:"
+    echo "  curl $curl_opts -X POST '${base_url}/v1/completions' \\"
+    echo "    -H 'Content-Type: application/json' \\"
+    echo "    -d '{\"model\":\"$MODEL_NAME\",\"prompt\":\"Hello\",\"max_tokens\":10}'"
+    echo ""
 
     local response http_code
     if response=$(curl -s $curl_opts -w "\n%{http_code}" --max-time 60 \
