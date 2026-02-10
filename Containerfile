@@ -4,8 +4,9 @@ RUN source /etc/os-release && \
     if [ "${PLATFORM_ID}" == "platform:el9" ]; then dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm; fi && \
     if [ "${PLATFORM_ID}" == "platform:el10" ]; then dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm; fi
 
-RUN dnf install -y python3-configargparse python3-kubernetes
+RUN dnf install -y python3-configargparse python3-kubernetes python3-pip python3-build
 
-COPY llmd-xks-checks.py /root/llmd-xks-checks
+COPY . /root/src
+RUN python3 -m build /root/src -w -o /root/src && python3 -m pip install --no-deps /root/src/*.whl && rm -rf /root/src
 
-ENTRYPOINT ["/root/llmd-xks-checks"]
+ENTRYPOINT ["/usr/local/bin/llmd-xks-preflight"]
