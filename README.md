@@ -1,4 +1,4 @@
-# LLMD xKS Preflight Checks
+# LLM-D xKS Preflight Checks
 
 A Python CLI application for running preflight checks on Kubernetes clusters. The tool connects to a Kubernetes cluster, detects the cloud provider, and executes a series of validation tests to ensure the cluster is properly configured and ready for use.
 
@@ -16,6 +16,12 @@ In order to build a container:
 
 ```bash
 make container
+```
+
+By default, the container is built on top of latest Fedora image. If you have an entitled Red Hat Enterprise Linux system, you can use UBI9 (Universal Basic Image) as the base:
+
+```bash
+FROM=registry.access.redhat.com/ubi9:latest make container
 ```
 
 In order to run the container locally:
