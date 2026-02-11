@@ -1,0 +1,63 @@
+# CA Issuer and certificate chain test
+# Tests cert-manager's ability to create a CA and issue certificates from it
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager-test
+---
+# First, create a self-signed issuer to bootstrap the CA
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-bootstrap
+  namespace: cert-manager-test
+spec:
+  selfSigned: {}
+---
+# Create a CA certificate using the self-signed issuer
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ca-cert
+  namespace: cert-manager-test
+spec:
+  secretName: ca-cert-tls
+  duration: 8760h # 1 year
+  renewBefore: 720h # 30 days
+  isCA: true
+  issuerRef:
+    name: selfsigned-bootstrap
+    kind: Issuer
+  commonName: Test CA
+  subject:
+    organizations:
+      - Test Organization
+---
+# Create a CA issuer using the CA certificate
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ca-issuer
+  namespace: cert-manager-test
+spec:
+  ca:
+    secretName: ca-cert-tls
+---
+# Issue a leaf certificate from the CA
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: leaf-cert
+  namespace: cert-manager-test
+spec:
+  secretName: leaf-cert-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  issuerRef:
+    name: ca-issuer
+    kind: Issuer
+  commonName: leaf.example.com
+  dnsNames:
+    - leaf.example.com
+    - "*.leaf.example.com"

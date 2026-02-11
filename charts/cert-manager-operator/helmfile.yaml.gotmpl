@@ -1,0 +1,48 @@
+# cert-manager Operator Helmfile
+#
+# Usage:
+#   1. Edit environments/default.yaml (set auth method)
+#   2. Run: helmfile apply
+
+environments:
+  default:
+    values:
+      - values.yaml
+      - environments/default.yaml
+
+---
+
+helmDefaults:
+  wait: true
+  timeout: 600
+
+releases:
+  - name: cert-manager-operator
+    namespace: {{ .Values.operatorNamespace }}
+    createNamespace: true
+    chart: ./
+    disableValidationOnInstall: true
+    values:
+      - values.yaml
+    set:
+      - name: bundle.version
+        value: {{ .Values.bundle.version }}
+{{- if .Values.useSystemPodmanAuth }}
+      - name: pullSecret.dockerConfigJson
+        file: {{ env "HOME" }}/.config/containers/auth.json
+{{- else if .Values.pullSecretFile }}
+      - name: pullSecret.dockerConfigJson
+        file: {{ .Values.pullSecretFile }}
+{{- else if .Values.authFile }}
+      - name: pullSecret.dockerConfigJson
+        file: {{ .Values.authFile }}
+{{- end }}
+    hooks:
+      # Create operand namespace before chart install
+      - events: ["presync"]
+        showlogs: true
+        command: "bash"
+        args: ["-c", "kubectl create namespace {{ .Values.operandNamespace }} --dry-run=client -o yaml | kubectl apply -f -"]
+      # Note: CRDs are in crds/ directory, CRs are in templates/
+      # - Infrastructure CR (templates/infrastructure-cr.yaml)
+      # - CertManager CR (templates/certmanager-cr.yaml)

@@ -1,0 +1,35 @@
+name: Helm Chart CI
+
+on:
+  pull_request:
+    paths:
+      - 'Chart.yaml'
+      - 'values.yaml'
+      - 'templates/**'
+      - 'manifests-crds/**'
+      - 'helmfile.yaml.gotmpl'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Chart.yaml'
+      - 'values.yaml'
+      - 'templates/**'
+      - 'manifests-crds/**'
+      - 'helmfile.yaml.gotmpl'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        run: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Lint Chart
+        run: helm lint .
+
+      - name: Template Chart
+        run: helm template test . > /dev/null
