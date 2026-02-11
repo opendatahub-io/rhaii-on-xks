@@ -27,6 +27,7 @@ echo ""
 echo "[1/4] Checking operator deployment..."
 if kubectl get deployment servicemesh-operator3 -n "$NAMESPACE" &>/dev/null; then
     READY=$(kubectl get deployment servicemesh-operator3 -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+    READY="${READY:-0}"
     if [ "$READY" -ge 1 ]; then
         echo "  OK: servicemesh-operator3 is running ($READY replicas)"
     else
@@ -61,6 +62,7 @@ echo "[3/4] Checking istiod..."
 ISTIOD=$(kubectl get deployment -n "$NAMESPACE" -l app=istiod -o name 2>/dev/null | head -1)
 if [ -n "$ISTIOD" ]; then
     READY=$(kubectl get "$ISTIOD" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+    READY="${READY:-0}"
     if [ "$READY" -ge 1 ]; then
         echo "  OK: istiod is running ($READY replicas)"
     else

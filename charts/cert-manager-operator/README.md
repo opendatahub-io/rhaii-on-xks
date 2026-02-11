@@ -145,7 +145,12 @@ The update-bundle.sh script:
 
 ## Update Pull Secret
 
-Red Hat pull secrets expire (typically yearly). To update:
+Personal Red Hat pull secrets and tokens typically expire (yearly). Registry
+Service Accounts created via the [Red Hat terms-based registry](https://access.redhat.com/terms-based-registry/)
+do not expire and are recommended for production (see Section 1.3 of the
+[deployment guide](../docs/deploying-llm-d-on-managed-kubernetes.md)).
+
+To update expiring credentials:
 
 ```bash
 # Option A: Using system podman auth (after re-login)

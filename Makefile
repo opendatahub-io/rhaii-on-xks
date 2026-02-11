@@ -81,6 +81,7 @@ undeploy-kserve: check-kubeconfig
 	-@kubectl delete inferencepool --all -A --ignore-not-found 2>/dev/null || true
 	-@kubectl delete deployment kserve-controller-manager -n $(KSERVE_NAMESPACE) --ignore-not-found 2>/dev/null || true
 	-@kubectl delete validatingwebhookconfiguration llminferenceservice.serving.kserve.io llminferenceserviceconfig.serving.kserve.io --ignore-not-found 2>/dev/null || true
+	-@# Removes KServe CRDs and Inference Extension CRDs (InferencePool, InferenceModel)
 	-@kubectl get crd -o name | grep -E "serving.kserve.io|inference.networking" | xargs -r kubectl delete --ignore-not-found 2>/dev/null || true
 	-@kubectl delete clusterissuer opendatahub-ca-issuer --ignore-not-found 2>/dev/null || true
 	-@kubectl delete namespace $(KSERVE_NAMESPACE) --ignore-not-found --wait=false 2>/dev/null || true

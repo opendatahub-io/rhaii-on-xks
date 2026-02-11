@@ -240,7 +240,7 @@ kubectl get secret opendatahub-ca -n cert-manager
 
 If missing, apply the cert-manager resources:
 ```bash
-kubectl apply -k config/overlays/odh-test/cert-manager  # from KServe repo
+kubectl apply -k https://github.com/kserve/kserve/config/overlays/odh-test/cert-manager?ref=release-v0.15
 ```
 
 ### Gateway pod not mounting CA

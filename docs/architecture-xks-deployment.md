@@ -87,14 +87,14 @@ We use Red Hat-supported operator bundles because:
 
 ### Repository Structure
 
-```
+```text
 rhaii-on-xks/                           # Monorepo
 ├── helmfile.yaml.gotmpl                # Imports operator charts (local paths)
 ├── values.yaml                         # Configuration
 ├── Makefile                            # make deploy, make status
 └── charts/
     ├── cert-manager-operator/          # Extracted operator
-    │   ├── crds/                       # CRDs (applied via presync)
+    │   ├── crds/                       # CRDs (installed by Helm with SSA)
     │   ├── templates/                  # Operator deployment, RBAC
     │   ├── scripts/update-bundle.sh    # Re-extract from newer bundle
     │   └── helmfile.yaml.gotmpl
@@ -113,24 +113,24 @@ rhaii-on-xks/                           # Monorepo
 
 ### Deployment Flow
 
-```
+```text
 User runs: make deploy
     │
     ├── helmfile apply (rhaii-on-xks)
     │       │
     │       ├── Import charts/cert-manager-operator
-    │       │       ├── presync: Apply CRDs
-    │       │       └── install: Deploy operator
+    │       │       ├── presync: Create operand namespace
+    │       │       └── install: Deploy operator + CRDs (Helm SSA)
     │       │
     │       ├── Import charts/sail-operator
-    │       │       ├── presync: Apply Gateway API CRDs
-    │       │       ├── presync: Apply Istio CRDs
-    │       │       ├── install: Deploy operator + Istio CR
+    │       │       ├── presync: Apply Gateway API CRDs (kustomize)
+    │       │       ├── presync: Apply istiod ServiceAccount
+    │       │       ├── install: Deploy operator + Istio CRDs (Helm SSA)
     │       │       └── postsync: Fix webhook loop workaround
     │       │
     │       └── Import charts/lws-operator
-    │               ├── presync: Apply CRDs
-    │               └── install: Deploy operator
+    │               ├── presync: Create namespace + ServiceAccount
+    │               └── install: Deploy operator + CRDs (Helm SSA)
     │
     └── Operators reconcile and deploy operands
             ├── cert-manager controller

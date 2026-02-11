@@ -13,6 +13,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_NAMESPACE="${TEST_NAMESPACE:-cert-manager-test}"
 TIMEOUT="${TIMEOUT:-120}"
 
+cleanup() {
+    kubectl delete -f "$SCRIPT_DIR/ca-test.yaml" --ignore-not-found >/dev/null 2>&1
+}
+trap cleanup EXIT
+
 echo ""
 echo "========================================"
 echo "  CA ISSUER CERTIFICATE TEST"
@@ -34,7 +39,6 @@ if ! kubectl wait --for=condition=ready certificate/ca-cert -n "$TEST_NAMESPACE"
     kubectl describe certificate/ca-cert -n "$TEST_NAMESPACE" 2>/dev/null || true
     echo ""
     echo "=== CA TEST: FAIL ==="
-    kubectl delete -f "$SCRIPT_DIR/ca-test.yaml" --ignore-not-found >/dev/null 2>&1
     exit 1
 fi
 
@@ -47,7 +51,6 @@ if ! kubectl wait --for=condition=ready certificate/leaf-cert -n "$TEST_NAMESPAC
     kubectl describe certificate/leaf-cert -n "$TEST_NAMESPACE" 2>/dev/null || true
     echo ""
     echo "=== CA TEST: FAIL ==="
-    kubectl delete -f "$SCRIPT_DIR/ca-test.yaml" --ignore-not-found >/dev/null 2>&1
     exit 1
 fi
 
@@ -72,12 +75,10 @@ if echo "$LEAF_CERT" | openssl verify -CAfile <(echo "$CA_CERT") >/dev/null 2>&1
 
     echo ""
     echo "=== CA TEST: PASS ==="
-    kubectl delete -f "$SCRIPT_DIR/ca-test.yaml" --ignore-not-found >/dev/null 2>&1
     exit 0
 else
     echo "ERROR: Certificate chain verification failed"
     echo ""
     echo "=== CA TEST: FAIL ==="
-    kubectl delete -f "$SCRIPT_DIR/ca-test.yaml" --ignore-not-found >/dev/null 2>&1
     exit 1
 fi

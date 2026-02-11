@@ -4,7 +4,7 @@
 operatorNamespace: cert-manager-operator
 operandNamespace: cert-manager
 
-# Bundle version
+# Bundle version — pinned to tested release; bump via ./scripts/update-bundle.sh
 bundle:
   version: "v1.15.2"
 

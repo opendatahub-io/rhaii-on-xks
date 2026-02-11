@@ -162,7 +162,10 @@ kubectl delete crd ztunnels.sailoperator.io --ignore-not-found
 
 # 5. Update istioVersion in values.yaml to match bundle
 # OSSM 3.1.x -> v1.26.x, OSSM 3.2.x -> v1.27.x
+# Linux (GNU sed):
 sed -i 's/istioVersion: .*/istioVersion: "v1.26.6"/' values.yaml
+# macOS (BSD sed):
+# sed -i '' 's/istioVersion: .*/istioVersion: "v1.26.6"/' values.yaml
 
 # 6. Redeploy
 helmfile apply

@@ -13,6 +13,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_NAMESPACE="${TEST_NAMESPACE:-cert-manager-test}"
 TIMEOUT="${TIMEOUT:-120}"
 
+cleanup() {
+    kubectl delete -f "$SCRIPT_DIR/selfsigned-test.yaml" --ignore-not-found >/dev/null 2>&1
+}
+trap cleanup EXIT
+
 echo ""
 echo "========================================"
 echo "  SELF-SIGNED CERTIFICATE TEST"
@@ -45,20 +50,17 @@ if kubectl wait --for=condition=ready certificate/selfsigned-cert -n "$TEST_NAME
             echo "Certificate CN verified: $CERT_CN"
             echo ""
             echo "=== SELF-SIGNED TEST: PASS ==="
-            kubectl delete -f "$SCRIPT_DIR/selfsigned-test.yaml" --ignore-not-found >/dev/null 2>&1
             exit 0
         else
             echo "Certificate CN mismatch. Got: $CERT_SUBJECT"
             echo ""
             echo "=== SELF-SIGNED TEST: FAIL ==="
-            kubectl delete -f "$SCRIPT_DIR/selfsigned-test.yaml" --ignore-not-found >/dev/null 2>&1
             exit 1
         fi
     else
         echo "ERROR: Secret 'selfsigned-cert-tls' not found"
         echo ""
         echo "=== SELF-SIGNED TEST: FAIL ==="
-        kubectl delete -f "$SCRIPT_DIR/selfsigned-test.yaml" --ignore-not-found >/dev/null 2>&1
         exit 1
     fi
 else
@@ -66,6 +68,5 @@ else
     kubectl describe certificate/selfsigned-cert -n "$TEST_NAMESPACE" 2>/dev/null || true
     echo ""
     echo "=== SELF-SIGNED TEST: FAIL ==="
-    kubectl delete -f "$SCRIPT_DIR/selfsigned-test.yaml" --ignore-not-found >/dev/null 2>&1
     exit 1
 fi

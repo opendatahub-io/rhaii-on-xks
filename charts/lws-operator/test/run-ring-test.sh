@@ -32,7 +32,7 @@ sleep 10
 
 echo "Checking leader health..."
 RESULT=$(kubectl exec -n "$TEST_NAMESPACE" ring-test-0 -- curl -s localhost:8080/health 2>/dev/null) || true
-COUNT=$(echo "$RESULT" | grep -o '10\.' | wc -l)
+COUNT=$(echo "$RESULT" | jq '.registered_workers | length' 2>/dev/null || echo 0)
 
 if [ "$COUNT" -ge 3 ]; then
     echo "$RESULT" | python3 -m json.tool 2>/dev/null || echo "$RESULT"

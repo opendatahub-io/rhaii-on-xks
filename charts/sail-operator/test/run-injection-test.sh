@@ -12,6 +12,11 @@ set -e
 NAMESPACE="${TEST_NAMESPACE:-sail-test}"
 TIMEOUT="${TIMEOUT:-120}"
 
+cleanup() {
+    kubectl delete namespace "$NAMESPACE" --ignore-not-found >/dev/null 2>&1
+}
+trap cleanup EXIT
+
 echo ""
 echo "========================================"
 echo "  SIDECAR INJECTION TEST"
@@ -59,13 +64,11 @@ if echo "$CONTAINERS" | grep -q "istio-proxy"; then
     echo "  Containers: $CONTAINERS"
     echo ""
     echo "=== INJECTION TEST: PASS (sidecar injected) ==="
-    kubectl delete namespace "$NAMESPACE" --ignore-not-found
     exit 0
 else
     echo "  Containers: $CONTAINERS"
     echo "  Expected: istio-proxy sidecar"
     echo ""
     echo "=== INJECTION TEST: FAIL (no sidecar) ==="
-    kubectl delete namespace "$NAMESPACE" --ignore-not-found
     exit 1
 fi

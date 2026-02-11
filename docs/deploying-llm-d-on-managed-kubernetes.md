@@ -136,7 +136,7 @@ Red Hat AI Inference Server on managed Kubernetes consists of the following comp
 
 ### Component Interaction
 
-```
+```text
                                     ┌─────────────────────────────────────┐
                                     │         Kubernetes Cluster          │
 ┌──────────┐    ┌──────────────┐    │  ┌─────────┐    ┌────────────────┐  │
@@ -177,7 +177,7 @@ make status
 
 **Expected output:**
 
-```
+```text
 === Deployment Status ===
 cert-manager-operator:
 NAME                                       READY   STATUS    RESTARTS   AGE
@@ -226,7 +226,7 @@ kubectl get pods -n opendatahub
 
 **Expected output:**
 
-```
+```text
 NAME                                        READY   STATUS    RESTARTS   AGE
 kserve-controller-manager-xxxxxxxxx-xxxxx   1/1     Running   0          2m
 ```
@@ -262,7 +262,7 @@ kubectl get gateway -n opendatahub
 
 **Expected output:**
 
-```
+```text
 NAME                CLASS   ADDRESS         PROGRAMMED   AGE
 inference-gateway   istio   20.xx.xx.xx     True         1m
 ```
@@ -321,12 +321,11 @@ spec:
     route: {}
     scheduler: {}
   template:
-    spec:
-      tolerations:
-      - key: "nvidia.com/gpu"
-        operator: "Equal"
-        value: "present"
-        effect: "NoSchedule"
+    tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Equal"
+      value: "present"
+      effect: "NoSchedule"
     containers:
     - name: main
       resources:
@@ -372,7 +371,7 @@ kubectl get llmisvc -n $NAMESPACE
 
 **Expected output:**
 
-```
+```text
 NAME                READY   URL                                    AGE
 qwen2-7b-instruct   True    http://20.xx.xx.xx/llm-inference/...   5m
 ```
