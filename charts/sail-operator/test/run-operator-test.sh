@@ -1,5 +1,12 @@
 #!/bin/bash
 # Test Sail operator deployment
+#
+# Verifies that the Sail Operator and Istio control plane (istiod)
+# are running and healthy in the target namespace.
+#
+# Environment variables:
+#   NAMESPACE - Istio system namespace (default: istio-system)
+#   TIMEOUT   - wait timeout in seconds (default: 120)
 set -e
 
 NAMESPACE="${NAMESPACE:-istio-system}"

@@ -1,5 +1,12 @@
 #!/bin/bash
 # Test that required CRDs are installed with correct versions
+#
+# Validates that Gateway API and Inference Extension CRDs are present
+# in the cluster and match the expected versions from values.yaml.
+#
+# Environment variables:
+#   GATEWAY_API_VERSION         - expected Gateway API version (default: v1.4.0)
+#   INFERENCE_EXTENSION_VERSION - expected Inference Extension version (default: v1.2.0)
 set -e
 
 # Expected versions (from values.yaml or override via env)

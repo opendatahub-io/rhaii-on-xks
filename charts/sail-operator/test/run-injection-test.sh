@@ -1,5 +1,12 @@
 #!/bin/bash
 # Test sidecar injection
+#
+# Deploys a test pod in a labeled namespace and verifies that
+# Istio sidecar injection is working correctly.
+#
+# Environment variables:
+#   TEST_NAMESPACE - namespace to run tests in (default: sail-test)
+#   TIMEOUT        - wait timeout in seconds (default: 120)
 set -e
 
 NAMESPACE="${TEST_NAMESPACE:-sail-test}"

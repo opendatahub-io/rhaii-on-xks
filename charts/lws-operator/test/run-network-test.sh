@@ -1,5 +1,12 @@
 #!/bin/bash
 # Run network bandwidth test
+#
+# Creates a LeaderWorkerSet and measures network bandwidth between
+# leader and worker pods to verify inter-pod communication.
+#
+# Environment variables:
+#   TEST_NAMESPACE - namespace to run tests in (default: lws-test)
+#   TIMEOUT        - wait timeout in seconds (default: 120)
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

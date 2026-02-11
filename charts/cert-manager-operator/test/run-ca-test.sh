@@ -1,5 +1,12 @@
 #!/bin/bash
 # Test CA issuer and certificate chain
+#
+# Verifies that cert-manager can issue certificates using a CA Issuer,
+# including root and intermediate certificate chain validation.
+#
+# Environment variables:
+#   TEST_NAMESPACE - namespace to run tests in (default: cert-manager-test)
+#   TIMEOUT        - wait timeout in seconds (default: 120)
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
