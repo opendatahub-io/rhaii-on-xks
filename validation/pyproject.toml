@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llmd-xks-preflight"
+version = "0.1.0"
+authors = [
+  { name="Costin Gamenț", email="cos@redhat.com" },
+]
+description = "Preflight checks for llm-d deployments using managed Kubernetes services (xKS)"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "configargparse>=1.7.1",
+    "kubernetes>=34.1"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/kwozyman/llmd-xks-preflight"
+"Bug Tracker" = "https://github.com/kwozyman/llmd-xks-preflight/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["llmd_xks_checks.py"]
+
+[project.scripts]
+llmd-xks-preflight = "llmd_xks_checks:main"
