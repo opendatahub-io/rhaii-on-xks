@@ -1,0 +1,116 @@
+name: Kserve Update Chart
+
+on:
+  schedule:
+    # Run every 2 hours
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      kserve_repo:
+        description: 'KServe repository (org/repo)'
+        required: false
+        default: 'red-hat-data-services/kserve'
+      kserve_ref:
+        description: 'KServe branch/tag to use'
+        required: false
+        default: 'rhoai-3.4'
+      rhoai_branch:
+        description: 'RHOAI-Build-Config branch for images'
+        required: false
+        default: 'rhoai-3.4'
+      image_tag:
+        description: 'Image tag for quay.io replacements'
+        required: false
+        default: '3.4.0-ea.1'
+
+permissions: { }
+
+env:
+  KSERVE_REPO: ${{ github.event.inputs.kserve_repo || 'red-hat-data-services/kserve' }}
+  KSERVE_REF: ${{ github.event.inputs.kserve_ref || 'rhoai-3.4' }}
+  RHOAI_BRANCH: ${{ github.event.inputs.rhoai_branch || 'rhoai-3.4' }}
+  IMAGE_TAG: ${{ github.event.inputs.image_tag || '3.4.0-ea.1' }}
+
+jobs:
+  update-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout chart repo
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Checkout kserve repo
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ env.KSERVE_REPO }}
+          ref: ${{ env.KSERVE_REF }}
+          path: ./charts/kserve/kserve
+          persist-credentials: false
+
+      - name: Setup Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+
+      - name: Generate chart
+        working-directory: ./charts/kserve
+        env:
+          RHOAI_BRANCH_VAL: ${{ env.RHOAI_BRANCH }}
+          IMAGE_TAG_VAL: ${{ env.IMAGE_TAG }}
+        run: |
+          ./generate-chart.sh \
+            --overlay ./kserve/config/overlays/odh-xks \
+            --branch "${RHOAI_BRANCH_VAL}" \
+            --tag "${IMAGE_TAG_VAL}"
+
+      - name: Update Chart version
+        env:
+          IMAGE_TAG_VAL: ${{ env.IMAGE_TAG }}
+        working-directory: ./charts/kserve
+        run: |
+          sed -i "s/^version: .*/version: ${IMAGE_TAG_VAL}/" Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: \"${IMAGE_TAG_VAL}\"/" Chart.yaml
+          echo "Updated Chart.yaml:"
+          grep -E '^(version|appVersion):' Chart.yaml
+
+      - name: Lint chart
+        working-directory: ./charts/kserve
+        run: helm lint .
+
+      - name: Check for changes
+        working-directory: ./charts/kserve
+        id: changes
+        run: |
+          if git diff --quiet files/ crds/ Chart.yaml && \
+             [ -z "$(git ls-files --others --exclude-standard files/ crds/)" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cleanup kserve checkout
+        run: rm -rf ./charts/kserve/kserve
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@67ccf781d68cd99b580ae25a5c18a1cc84ffff1f # v7.0.6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update Kserve chart from ${{ env.KSERVE_REPO }}@${{ env.KSERVE_REF }}"
+          title: "chore: Update Kserve chart resources"
+          body: |
+            Automated update of Kserve chart resources.
+
+            - KServe repo: `${{ env.KSERVE_REPO }}`
+            - KServe ref: `${{ env.KSERVE_REF }}`
+            - RHOAI branch: `${{ env.RHOAI_BRANCH }}`
+            - Image tag: `${{ env.IMAGE_TAG }}`
+
+            Please review the image changes before merging.
+          branch: auto-update-kserve-chart-resources
+          delete-branch: true
+          labels: |
+            automated
+            area/kserve
+            chart-update

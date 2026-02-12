@@ -1,0 +1,64 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: opendatahub/kserve-webhook-server
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/part-of: kserve
+  name: llminferenceservice.serving.kserve.io
+webhooks:
+  - admissionReviewVersions:
+      - v1
+      - v1beta1
+    clientConfig:
+      service:
+        name: kserve-webhook-server-service
+        namespace: opendatahub
+        path: /validate-serving-kserve-io-v1alpha1-llminferenceservice
+    failurePolicy: Fail
+    name: llminferenceservice.kserve-webhook-server.validator
+    rules:
+      - apiGroups:
+          - serving.kserve.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - llminferenceservices
+    sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: opendatahub/kserve-webhook-server
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/part-of: kserve
+  name: llminferenceserviceconfig.serving.kserve.io
+webhooks:
+  - admissionReviewVersions:
+      - v1
+      - v1beta1
+    clientConfig:
+      service:
+        name: kserve-webhook-server-service
+        namespace: opendatahub
+        path: /validate-serving-kserve-io-v1alpha1-llminferenceserviceconfig
+    failurePolicy: Fail
+    name: llminferenceserviceconfig.kserve-webhook-server.validator
+    rules:
+      - apiGroups:
+          - serving.kserve.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        resources:
+          - llminferenceserviceconfigs
+    sideEffects: None

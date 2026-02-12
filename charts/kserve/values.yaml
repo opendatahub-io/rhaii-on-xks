@@ -1,0 +1,3 @@
+# Default values for kserve-rhaii-xks
+# This chart uses pre-rendered Kustomize output with embedded Go templates
+# that are passed through unchanged to the cluster.

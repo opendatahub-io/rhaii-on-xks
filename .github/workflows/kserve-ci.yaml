@@ -1,0 +1,71 @@
+name: Kserve CI
+
+on:
+  push:
+    branches: [main, rhoai-*, odh-*, master]
+    paths:
+      - 'charts/kserve/**'
+      - '.github/workflows/kserve-ci.yaml'
+  pull_request:
+    branches: [main, rhoai-*, odh-*, master]
+    paths:
+      - 'charts/kserve/**'
+      - '.github/workflows/kserve-ci.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+
+      - name: Lint chart
+        working-directory: ./charts/kserve
+        run: helm lint .
+
+      - name: Template chart
+        working-directory: ./charts/kserve
+        run: helm template test . > /dev/null
+
+      - name: Verify all images from registry.redhat.io
+        working-directory: ./charts/kserve
+        run: |
+          NON_RH=$(helm template test . | grep -oE '(quay\.io|ghcr\.io|docker\.io)[^"'\''[:space:]]+' || true)
+          if [[ -n "${NON_RH}" ]]; then
+            echo "ERROR: Found non-registry.redhat.io images:"
+            echo "${NON_RH}"
+            exit 1
+          fi
+          echo "All images are from registry.redhat.io"
+
+      - name: Verify webhook hook annotations
+        working-directory: ./charts/kserve
+        run: |
+          WEBHOOKS=$(helm template test . | grep -A20 'kind: ValidatingWebhookConfiguration\|kind: MutatingWebhookConfiguration' || true)
+          if [[ -n "${WEBHOOKS}" ]]; then
+            if ! echo "${WEBHOOKS}" | grep -q 'helm.sh/hook:'; then
+              echo "ERROR: Webhook configurations are missing Helm hook annotations"
+              exit 1
+            fi
+            echo "Webhook configurations have proper Helm hook annotations"
+          else
+            echo "No webhook configurations found"
+          fi
+
+      - name: Verify CRDs in crds/ directory
+        working-directory: ./charts/kserve
+        run: |
+          if [[ ! -d "crds" ]] || [[ -z "$(ls -A crds/*.yaml 2>/dev/null)" ]]; then
+            echo "WARNING: No CRDs found in crds/ directory"
+          else
+            echo "CRDs found:"
+            ls -la crds/
+          fi

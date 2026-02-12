@@ -1,0 +1,221 @@
+name: Kserve Release Chart
+
+on:
+  push:
+    branches: [main, rhoai-*, odh-*, master]
+    paths:
+      - 'charts/kserve/**'
+      - '.github/workflows/kserve-release.yaml'
+
+permissions: {}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+
+      - name: Get chart version
+        working-directory: ./charts/kserve
+        id: chart
+        run: |
+          BASE_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="${BASE_VERSION}+${SHORT_SHA}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "base_version=${BASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "Chart version: ${VERSION}"
+
+      - name: Package chart
+        working-directory: ./charts/kserve
+        run: helm package . --version "${{ steps.chart.outputs.version }}"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
+        with:
+          tag_name: kserve-v${{ steps.chart.outputs.version }}
+          name: Release Kserve v${{ steps.chart.outputs.version }}
+          files: "charts/kserve/*.tgz"
+          generate_release_notes: true
+          make_latest: true
+
+      - name: Login to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        env:
+          ACTOR: ${{ github.actor }}
+        with:
+          registry: ghcr.io
+          username: ${{ env.ACTOR }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to OCI registry
+        working-directory: ./charts/kserve
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          helm push *.tgz "oci://ghcr.io/${OWNER,,}"
+
+  release-dev:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout kserve repo
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: 'opendatahub-io/kserve'
+          ref: 'release-v0.15'
+          path: charts/kserve/kserve
+          persist-credentials: false
+
+      - name: Setup Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+
+      - name: Generate dev chart
+        working-directory: ./charts/kserve
+        run: |
+          ./generate-chart.sh \
+            --overlay ./kserve/config/overlays/odh-xks \
+            --skip-image-replacement
+
+      - name: Get kserve commit SHA
+        id: kserve
+        working-directory: ./charts/kserve
+        run: |
+          KSERVE_SHA=$(git -C kserve rev-parse --short HEAD)
+          echo "sha=${KSERVE_SHA}" >> $GITHUB_OUTPUT
+          echo "Kserve commit: ${KSERVE_SHA}"
+
+      - name: Login to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        env:
+          ACTOR: ${{ github.actor }}
+        with:
+          registry: ghcr.io
+          username: ${{ env.ACTOR }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up kserve checkout
+        working-directory: ./charts/kserve
+        run: rm -rf kserve
+
+      - name: Mirror images to GHCR
+        working-directory: ./charts/kserve
+        env:
+          OWNER: ${{ github.repository_owner }}
+          KSERVE_SHA: ${{ steps.kserve.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          GHCR_PREFIX="ghcr.io/${OWNER,,}/rhaii-on-xks"
+
+          # Extract all container images from the chart (both resources and webhooks)
+          IMAGES=$(grep -oE '(quay\.io|ghcr\.io|docker\.io)[^"'\''[:space:]]+' files/*.yaml | sed 's/^[^:]*://' | sort -u)
+
+          echo "Found images to mirror:"
+          echo "${IMAGES}"
+          echo ""
+
+          for IMAGE in ${IMAGES}; do
+            # Parse image components
+            # Handle both tag (:tag) and digest (@sha256:...) formats
+            if [[ "${IMAGE}" == *"@sha256:"* ]]; then
+              REPO="${IMAGE%%@*}"
+              REF="${IMAGE}"
+            elif [[ "${IMAGE}" == *":"* ]]; then
+              REPO="${IMAGE%:*}"
+              REF="${IMAGE}"
+            else
+              REPO="${IMAGE}"
+              REF="${IMAGE}:latest"
+            fi
+
+            # Extract image name (last component of repo path)
+            IMAGE_NAME="${REPO##*/}"
+
+            # Get the digest of the source image
+            echo "Inspecting ${REF}..."
+            DIGEST=$(docker buildx imagetools inspect "${REF}" --format '{{json .Manifest}}' | jq -r '.digest')
+
+            if [[ -z "${DIGEST}" || "${DIGEST}" == "null" ]]; then
+              echo "ERROR: Could not get digest for ${REF}"
+              exit 1
+            fi
+
+            TARGET="${GHCR_PREFIX}/${IMAGE_NAME}:${KSERVE_SHA}@${DIGEST}"
+
+            echo "Mirroring ${REF} -> ${TARGET}"
+
+            # Copy image to GHCR using buildx imagetools (tag is kserve commit SHA for traceability)
+            docker buildx imagetools create --tag "${GHCR_PREFIX}/${IMAGE_NAME}:${KSERVE_SHA}" "${REF}"
+
+            # Replace in chart files (escape dots for sed)
+            IMAGE_ESCAPED="${IMAGE//./\\.}"
+            sed -i "s#${IMAGE_ESCAPED}#${TARGET}#g" files/*.yaml
+            echo "  Replaced in chart"
+            echo ""
+          done
+
+          echo "Final images in chart:"
+          grep -oE '(quay\.io|ghcr\.io|docker\.io|registry\.redhat\.io)[^"'\''[:space:]]+' files/*.yaml | sed 's/^[^:]*://' | sort -u
+
+      - name: Lint chart
+        working-directory: ./charts/kserve
+        run: helm lint .
+
+      - name: Template chart
+        working-directory: ./charts/kserve
+        run: helm template test . > /dev/null
+
+      - name: Get chart version
+        working-directory: ./charts/kserve
+        id: chart
+        run: |
+          BASE_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="${BASE_VERSION}-dev-${SHORT_SHA}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "base_version=${BASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "Chart version: ${VERSION}"
+
+      - name: Package chart
+        working-directory: ./charts/kserve
+        run: helm package . --version "${{ steps.chart.outputs.version }}"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
+        with:
+          tag_name: kserve-v${{ steps.chart.outputs.version }}
+          name: Kserve Dev Chart Release v${{ steps.chart.outputs.version }}
+          files: "charts/kserve/*.tgz"
+          generate_release_notes: true
+          make_latest: false
+          prerelease: true
+
+      - name: Push to OCI registry
+        working-directory: ./charts/kserve
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          helm push *.tgz "oci://ghcr.io/${OWNER,,}"

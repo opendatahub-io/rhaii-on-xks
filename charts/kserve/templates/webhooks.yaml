@@ -1,0 +1,29 @@
+{{- $webhookFile := .Files.Get "files/webhooks.yaml" }}
+{{- if $webhookFile }}
+{{- range $doc := regexSplit "(?m)^---$" $webhookFile -1 }}
+{{- $webhook := fromYaml $doc }}
+{{- if and $webhook $webhook.kind }}
+---
+apiVersion: {{ $webhook.apiVersion }}
+kind: {{ $webhook.kind }}
+metadata:
+  name: {{ $webhook.metadata.name }}
+  {{- with $webhook.metadata.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  labels:
+    {{- range $key, $value := $webhook.metadata.labels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+  annotations:
+    # Helm hooks to ensure webhooks are created after all other resources
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    {{- range $key, $value := $webhook.metadata.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+webhooks:
+{{ $webhook.webhooks | toYaml | indent 2 }}
+{{- end }}
+{{- end }}
+{{- end }}
