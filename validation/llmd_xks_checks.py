@@ -87,7 +87,6 @@ class LLMDXKSChecks:
         ]
 
         self.run(self.tests)
-        self.report()
 
     def _log_init(self):
         logger = logging.getLogger(__name__)
@@ -284,6 +283,7 @@ class LLMDXKSChecks:
         return None
 
     def report(self):
+        failed_counter = 0
         for test in self.tests:
             if test["result"]:
                 print(f"Test {test['name']} PASSED")
@@ -293,7 +293,9 @@ class LLMDXKSChecks:
                 else:
                     print(f"Test {test['name']} FAILED")
                     print(f"    Suggested action: {test['suggested_action']}")
-        return None
+                    failed_counter += 1
+                    print("Failed counter: {}".format(failed_counter))
+        return failed_counter
 
 
 def cli_arguments():
@@ -345,8 +347,9 @@ def cli_arguments():
 
 def main():
     args = cli_arguments()
-    LLMDXKSChecks(**vars(args))
+    validator = LLMDXKSChecks(**vars(args))
+    sys.exit(validator.report())
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
