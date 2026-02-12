@@ -22,6 +22,7 @@ help:
 	@echo "  CONTAINER_TAG=$(CONTAINER_TAG) Container tag to use for build and run"
 	@echo "  CONTAINER_TOOL=$(CONTAINER_TOOL) Container tool to use for build and run"
 	@echo "  HOST_KUBECONFIG=$(HOST_KUBECONFIG) Path to kubeconfig for container run"
+	@echo "  FROM=$(FROM) Base image to use for the container build"
 
 
 # Build a container image from the current directory
