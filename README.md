@@ -1,36 +1,40 @@
 # rhaii-on-xks
 
-Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLMInferenceService) on managed Kubernetes platforms (AKS, CoreWeave).
+Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLMInferenceService) on managed Kubernetes
+platforms (AKS, CoreWeave).
 
-> **Getting started?** See the [Deploying Red Hat AI Inference Server on Managed Kubernetes](./docs/deploying-llm-d-on-managed-kubernetes.md) guide for step-by-step deployment instructions.
+> **Getting started?** See
+> the [Deploying Red Hat AI Inference Server on Managed Kubernetes](./docs/deploying-llm-d-on-managed-kubernetes.md)
+> guide for step-by-step deployment instructions.
 
 ## Related Repositories
 
-| Repository | Purpose |
-|------------|---------|
-| [llm-d-xks-aks](https://github.com/kwozyman/llm-d-xks-aks) | AKS cluster provisioning (creates cluster + GPU nodes + GPU Operator) |
-| [rhaii-xks-kserve](https://github.com/pierDipi/rhaii-xks-kserve) | KServe Helm charts (WIP) |
+| Repository                                                       | Purpose                                                               |
+|------------------------------------------------------------------|-----------------------------------------------------------------------|
+| [llm-d-xks-aks](https://github.com/kwozyman/llm-d-xks-aks)       | AKS cluster provisioning (creates cluster + GPU nodes + GPU Operator) |
+| [rhaii-xks-kserve](https://github.com/pierDipi/rhaii-xks-kserve) | KServe Helm charts (WIP)                                              |
 
 ## Overview
 
-| Component | App Version | Description |
-|-----------|-------------|-------------|
-| cert-manager-operator | 1.15.2 | TLS certificate management |
-| sail-operator (Istio) | 3.2.x | Gateway API for inference routing |
-| lws-operator | 1.0 | LeaderWorkerSet controller for multi-node workloads |
+| Component             | App Version | Description                                         |
+|-----------------------|-------------|-----------------------------------------------------|
+| cert-manager-operator | 1.15.2      | TLS certificate management                          |
+| sail-operator (Istio) | 3.2.x       | Gateway API for inference routing                   |
+| lws-operator          | 1.0         | LeaderWorkerSet controller for multi-node workloads |
 
 ### Version Compatibility
 
-| Component | Version | Notes |
-|-----------|---------|-------|
-| OSSM (Sail Operator) | 3.2.x | Gateway API for inference routing |
-| Istio | v1.27.x | Service mesh |
-| InferencePool API | v1 | `inference.networking.k8s.io/v1` |
-| KServe | release-v0.15 | LLMInferenceService controller |
+| Component            | Version    | Notes                             |
+|----------------------|------------|-----------------------------------|
+| OSSM (Sail Operator) | 3.2.x      | Gateway API for inference routing |
+| Istio                | v1.27.x    | Service mesh                      |
+| InferencePool API    | v1         | `inference.networking.k8s.io/v1`  |
+| KServe               | rhoai-3.4+ | LLMInferenceService controller    |
 
 ## Prerequisites
 
-- Kubernetes cluster (AKS or CoreWeave) - see [llm-d-xks-aks](https://github.com/kwozyman/llm-d-xks-aks) for AKS provisioning
+- Kubernetes cluster (AKS or CoreWeave) - see [llm-d-xks-aks](https://github.com/kwozyman/llm-d-xks-aks) for AKS
+  provisioning
 - `kubectl`, `helm` (v3.17+), `helmfile`, `kustomize` (v5.7+)
 - Red Hat account (for Sail Operator and vLLM images from `registry.redhat.io`)
 
@@ -59,11 +63,13 @@ $ podman pull registry.redhat.io/openshift-service-mesh/istio-sail-operator-bund
 ```
 
 Then configure `values.yaml`:
+
 ```yaml
 useSystemPodmanAuth: true
 ```
 
 **Alternative:** Download the pull secret file (OpenShift secret tab) and copy to persistent location:
+
 ```bash
 mkdir -p ~/.config/containers
 cp ~/pull-secret.txt ~/.config/containers/auth.json
@@ -85,6 +91,7 @@ Login Succeeded!
 This stores credentials in `${XDG_RUNTIME_DIR}/containers/auth.json` or `~/.config/containers/auth.json`.
 
 Then configure `values.yaml`:
+
 ```yaml
 useSystemPodmanAuth: true
 ```
@@ -163,6 +170,7 @@ kubectl get gateway -n opendatahub
 <summary>What the script does (click to expand)</summary>
 
 The script:
+
 1. Copies the CA bundle from cert-manager to opendatahub namespace
 2. Creates a Gateway with the CA bundle mounted for mTLS to backend services
 3. Patches the Gateway pod to use the pull secret
@@ -173,11 +181,11 @@ The script:
 
 #### Hardware Requirements
 
-| Resource | Per Replica | Notes |
-|----------|-------------|-------|
-| GPU | 1x NVIDIA GPU | A10, A100, H100, or similar |
-| CPU | 2-4 cores | |
-| Memory | 16-32 Gi | Depends on model size |
+| Resource | Per Replica   | Notes                       |
+|----------|---------------|-----------------------------|
+| GPU      | 1x NVIDIA GPU | A10, A100, H100, or similar |
+| CPU      | 2-4 cores     |                             |
+| Memory   | 16-32 Gi      | Depends on model size       |
 
 #### Node Requirements
 
@@ -192,6 +200,7 @@ kubectl describe nodes | grep -A5 "nvidia.com/gpu"
 ```
 
 For AKS, create a GPU node pool:
+
 ```bash
 az aks nodepool add \
   --resource-group <rg> \
@@ -289,14 +298,14 @@ curl -X POST "${SERVICE_URL}/v1/chat/completions" \
 
 #### More Examples
 
-| Example | Description | Path |
-|---------|-------------|------|
-| CPU (OPT-125M) | Simple CPU deployment for testing | `docs/samples/llmisvc/opt-125m-cpu/` |
-| GPU with Scheduler | Intelligent request routing | `docs/samples/llmisvc/single-node-gpu/` |
-| Prefill-Decode | Disaggregated serving | `docs/samples/llmisvc/single-node-gpu/llm-inference-service-pd-qwen2-7b-gpu.yaml` |
-| Multi-node MoE | DeepSeek with expert parallelism | `docs/samples/llmisvc/dp-ep/` |
+| Example            | Description                       | Path                                                                              |
+|--------------------|-----------------------------------|-----------------------------------------------------------------------------------|
+| CPU (OPT-125M)     | Simple CPU deployment for testing | `docs/samples/llmisvc/opt-125m-cpu/`                                              |
+| GPU with Scheduler | Intelligent request routing       | `docs/samples/llmisvc/single-node-gpu/`                                           |
+| Prefill-Decode     | Disaggregated serving             | `docs/samples/llmisvc/single-node-gpu/llm-inference-service-pd-qwen2-7b-gpu.yaml` |
+| Multi-node MoE     | DeepSeek with expert parallelism  | `docs/samples/llmisvc/dp-ep/`                                                     |
 
-See the [KServe samples](https://github.com/opendatahub-io/kserve/tree/main/docs/samples/llmisvc) for more examples.
+See more [KServe samples](https://github.com/red-hat-data-services/kserve/tree/rhoai-3.4/docs/samples/llmisvc).
 
 ---
 
@@ -305,15 +314,14 @@ See the [KServe samples](https://github.com/opendatahub-io/kserve/tree/main/docs
 ```bash
 # Deploy
 make deploy              # cert-manager + istio
-make deploy-all          # cert-manager + istio + lws
+make deploy-all          # cert-manager + istio + lws + kserve
 make deploy-kserve       # Deploy KServe
 
 # Undeploy
 make undeploy            # Remove all infrastructure
-make undeploy-kserve     # Remove KServe
 
 # Test (ODH conformance)
-make test NAMESPACE=llm-d           # Run conformance tests
+make test NAMESPACE=llm-d-test      # Run conformance tests
 make test PROFILE=kserve-gpu        # With specific profile
 
 # Other
@@ -359,11 +367,11 @@ The odh-xks overlay disables several OpenShift-specific features for vanilla Kub
   value: "true"              # No OpenShift SecurityContextConstraints
 ```
 
-| Setting | Why Disabled on xKS |
-|---------|---------------------|
-| `LLMISVC_MONITORING_DISABLED` | Prometheus Operator not required for basic inference |
-| `LLMISVC_AUTH_DISABLED` | Authorino/Kuadrant (Red Hat Connectivity Link) is OpenShift-only |
-| `LLMISVC_SCC_DISABLED` | SecurityContextConstraints are OpenShift-specific |
+| Setting                       | Why Disabled on xKS                                              |
+|-------------------------------|------------------------------------------------------------------|
+| `LLMISVC_MONITORING_DISABLED` | Prometheus Operator not required for basic inference             |
+| `LLMISVC_AUTH_DISABLED`       | Authorino/Kuadrant (Red Hat Connectivity Link) is OpenShift-only |
+| `LLMISVC_SCC_DISABLED`        | SecurityContextConstraints are OpenShift-specific                |
 
 ### Enabling Monitoring
 
@@ -372,6 +380,7 @@ To enable Prometheus monitoring for KServe-managed workloads:
 1. Deploy Prometheus Operator on your cluster (see [monitoring-stack/](./monitoring-stack/))
 
 2. Patch the KServe controller to enable monitoring:
+
 ```bash
 kubectl set env deployment/kserve-controller-manager \
   -n opendatahub \
@@ -390,7 +399,8 @@ If you encounter issues, collect diagnostic information for troubleshooting or t
 ./scripts/collect-debug-info.sh
 ```
 
-This collects logs, status, and events from all components (cert-manager, Istio, LWS, KServe) into a single directory. See the [Collecting Debug Information](./docs/collecting-debug-information.md) guide for details.
+This collects logs, status, and events from all components (cert-manager, Istio, LWS, KServe) into a single directory.
+See the [Collecting Debug Information](./docs/collecting-debug-information.md) guide for details.
 
 ---
 
@@ -399,31 +409,19 @@ This collects logs, status, and events from all components (cert-manager, Istio,
 ### KServe Controller Issues
 
 If the controller pod is stuck in `ContainerCreating` (waiting for certificate):
+
 ```bash
 # Apply cert-manager resources separately first
-kubectl apply -k "https://github.com/opendatahub-io/kserve/config/overlays/odh-test/cert-manager?ref=release-v0.15"
+kubectl apply -k "https://github.com/red-hat-data-services/kserve/config/overlays/odh-test/cert-manager?ref=rhoai-3.4"
 kubectl wait --for=condition=Ready certificate/kserve-webhook-server -n opendatahub --timeout=120s
 
-# Then re-apply the overlay
-kustomize build "https://github.com/opendatahub-io/kserve/config/overlays/odh-xks?ref=release-v0.15" | kubectl apply --server-side --force-conflicts -f -
-```
-
-If webhook validation blocks apply (manual deployment only - `make deploy-kserve` handles this automatically):
-```bash
-kubectl delete validatingwebhookconfiguration llminferenceservice.serving.kserve.io llminferenceserviceconfig.serving.kserve.io
-kustomize build "https://github.com/opendatahub-io/kserve/config/overlays/odh-xks?ref=release-v0.15" | kubectl apply --server-side --force-conflicts -f -
-```
-
-If you get "no matches for kind LLMInferenceServiceConfig" errors:
-```bash
-# This is a CRD timing issue - run the apply command again after CRDs are registered
-sleep 5
-kustomize build "https://github.com/opendatahub-io/kserve/config/overlays/odh-xks?ref=release-v0.15" | kubectl apply --server-side --force-conflicts -f -
+make deploy-kserve
 ```
 
 ### Gateway Issues
 
 If Gateway pod has `ErrImagePull`:
+
 ```bash
 # Copy pull secret to opendatahub namespace
 kubectl get secret redhat-pull-secret -n istio-system -o yaml | \
@@ -461,6 +459,7 @@ make deploy-istio
 ### TLS Certificate Architecture
 
 The odh-xks overlay creates an OpenDataHub-scoped CA:
+
 1. Self-signed bootstrap issuer creates root CA in cert-manager namespace
 2. ClusterIssuer (`opendatahub-ca-issuer`) uses this CA to sign certificates
 3. KServe controller generates certificates for LLM workload mTLS automatically
@@ -468,14 +467,14 @@ The odh-xks overlay creates an OpenDataHub-scoped CA:
 
 ### Key Differences from OpenShift (ODH) Overlay
 
-| Component | OpenShift (ODH) | Vanilla K8s (odh-xks) |
-|-----------|-----------------|----------------------|
-| Certificates | OpenShift service-ca | cert-manager |
-| Security constraints | SCC included | Removed |
-| Traffic routing | Istio VirtualService | Gateway API |
-| Webhook CA injection | Service annotations | cert-manager annotations |
-| Auth | Authorino/Kuadrant | Disabled |
-| Monitoring | Prometheus included | Disabled (optional) |
+| Component            | OpenShift (ODH)      | Vanilla K8s (odh-xks)    |
+|----------------------|----------------------|--------------------------|
+| Certificates         | OpenShift service-ca | cert-manager             |
+| Security constraints | SCC included         | Removed                  |
+| Traffic routing      | Istio VirtualService | Gateway API              |
+| Webhook CA injection | Service annotations  | cert-manager annotations |
+| Auth                 | Authorino/Kuadrant   | Disabled                 |
+| Monitoring           | Prometheus included  | Disabled (optional)      |
 
 ---
 
@@ -491,6 +490,7 @@ rhaii-on-xks/
 │   ├── cert-manager-operator/    # cert-manager operator Helm chart
 │   ├── sail-operator/            # Sail/Istio operator Helm chart
 │   └── lws-operator/             # LWS operator Helm chart
+│   └── kserve/                   # Kserve controller Helm chart
 └── scripts/
     ├── cleanup.sh             # Cleanup infrastructure (helmfile destroy + finalizers)
     └── setup-gateway.sh       # Set up Gateway with CA bundle for mTLS
@@ -503,5 +503,6 @@ Operator Helm charts are included locally under `charts/`:
 - `charts/cert-manager-operator/` — cert-manager operator
 - `charts/sail-operator/` — Sail/Istio operator
 - `charts/lws-operator/` — LeaderWorkerSet operator
+- `charts/kserve/` — Kserve controller
 
 The helmfile imports these local charts including presync hooks for CRD installation.

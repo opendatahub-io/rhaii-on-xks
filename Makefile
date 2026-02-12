@@ -3,8 +3,8 @@
 .PHONY: test conformance
 
 HELMFILE_CACHE := $(HOME)/.cache/helmfile
-KSERVE_REF ?= release-v0.15
-KSERVE_NAMESPACE ?= opendatahub
+KSERVE_REF ?= rhoai-3.4
+KSERVE_NAMESPACE ?= opendatahub # Note: this namespace can't be easily changed.
 
 check-kubeconfig:
 	@kubectl cluster-info >/dev/null 2>&1 || (echo "ERROR: Cannot connect to cluster. Check KUBECONFIG." && exit 1)
@@ -42,8 +42,7 @@ deploy: check-kubeconfig clear-cache
 	helmfile apply --selector name=sail-operator
 	@$(MAKE) status
 
-deploy-all: check-kubeconfig clear-cache
-	helmfile apply
+deploy-all: check-kubeconfig clear-cache deploy-cert-manager deploy-istio deploy-lws deploy-kserve
 	@$(MAKE) status
 
 deploy-cert-manager: check-kubeconfig clear-cache
@@ -55,37 +54,26 @@ deploy-istio: check-kubeconfig clear-cache
 deploy-lws: check-kubeconfig clear-cache
 	helmfile apply --selector name=lws-operator
 
-deploy-kserve: check-kubeconfig
-	@echo "=== Deploying KServe (ref=$(KSERVE_REF)) ==="
+deploy-opendatahub-prerequisites: check-kubeconfig
+	@echo "=== Deploying OpenDataHub prerequisites ==="
 	kubectl create namespace $(KSERVE_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 	-kubectl get secret redhat-pull-secret -n istio-system -o yaml 2>/dev/null | \
 		sed 's/namespace: istio-system/namespace: $(KSERVE_NAMESPACE)/' | \
 		kubectl apply -f - 2>/dev/null || true
-	kubectl apply -k "https://github.com/opendatahub-io/kserve/config/overlays/odh-test/cert-manager?ref=$(KSERVE_REF)"
+
+deploy-cert-manager-pki: check-kubeconfig deploy-opendatahub-prerequisites
+	kubectl apply -k "https://github.com/red-hat-data-services/kserve/config/overlays/odh-test/cert-manager?ref=$(KSERVE_REF)"
 	kubectl wait --for=condition=Ready clusterissuer/opendatahub-ca-issuer --timeout=120s
-	@echo "Applying CRDs and deployment (CR errors expected, will retry)..."
-	-kustomize build "https://github.com/opendatahub-io/kserve/config/overlays/odh-xks?ref=$(KSERVE_REF)" | kubectl apply --server-side --force-conflicts -f - 2>/dev/null || true
-	@echo "Removing webhooks to allow controller startup..."
-	-kubectl delete validatingwebhookconfiguration llminferenceservice.serving.kserve.io llminferenceserviceconfig.serving.kserve.io --ignore-not-found 2>/dev/null || true
-	kubectl wait --for=condition=Available deployment/kserve-controller-manager -n $(KSERVE_NAMESPACE) --timeout=300s
-	@echo "Controller ready, applying CRs..."
-	kustomize build "https://github.com/opendatahub-io/kserve/config/overlays/odh-xks?ref=$(KSERVE_REF)" | kubectl apply --server-side --force-conflicts -f -
+	kubectl wait --for=condition=Ready certificate/kserve-webhook-server -n opendatahub --timeout=120s
+
+deploy-kserve: check-kubeconfig clear-cache deploy-cert-manager-pki
+	@echo "Applying KServe via Helm..."
+	helmfile sync --wait --selector name=kserve-rhaii-xks --skip-crds
 	@echo "=== KServe deployed ==="
 
 # Undeploy
 undeploy: check-kubeconfig
 	@./scripts/cleanup.sh -y
-
-undeploy-kserve: check-kubeconfig
-	-@kubectl delete llminferenceservice --all -A --ignore-not-found 2>/dev/null || true
-	-@kubectl delete inferencepool --all -A --ignore-not-found 2>/dev/null || true
-	-@kubectl delete deployment kserve-controller-manager -n $(KSERVE_NAMESPACE) --ignore-not-found 2>/dev/null || true
-	-@kubectl delete validatingwebhookconfiguration llminferenceservice.serving.kserve.io llminferenceserviceconfig.serving.kserve.io --ignore-not-found 2>/dev/null || true
-	-@# Removes KServe CRDs and Inference Extension CRDs (InferencePool, InferenceModel)
-	-@kubectl get crd -o name | grep -E "serving.kserve.io|inference.networking" | xargs -r kubectl delete --ignore-not-found 2>/dev/null || true
-	-@kubectl delete clusterissuer opendatahub-ca-issuer --ignore-not-found 2>/dev/null || true
-	-@kubectl delete namespace $(KSERVE_NAMESPACE) --ignore-not-found --wait=false 2>/dev/null || true
-	@echo "=== KServe removed ==="
 
 # Status
 status: check-kubeconfig
