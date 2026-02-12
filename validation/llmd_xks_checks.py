@@ -123,7 +123,8 @@ class LLMDXKSChecks:
             if crd not in all_crds:
                 self.logger.warning(f"Missing CRD: {crd}")
                 return_value = False
-        self.logger.debug("All tested CRDs are present")
+        if return_value:
+            self.logger.debug("All tested CRDs are present")
         return return_value
 
     def test_crd_certmanager(self):
