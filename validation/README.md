@@ -1,6 +1,6 @@
 # LLM-D xKS Preflight Validation Checks
 
-A CLI application for running validation checks against Kubernetes clusters in the context of Red Hat AI Inference Server (KServe LLMInferenceService) on managed Kubernetes platforms (AKS, CoreWeave etc). The tool connects to a running Kubernetes cluster, detects the cloud provider, and executes a series of validation tests to ensure the cluster is properly configured and ready for use.
+A CLI application for running validation checks against Kubernetes clusters in the context of Red Hat AI Inference Server (KServe LLMInferenceService) on managed Kubernetes platforms (AKS, CoreWeave etc.). The tool connects to a running Kubernetes cluster, detects the cloud provider, and executes a series of validation tests to ensure the cluster is properly configured and ready for use.
 
 ## Features
 
@@ -106,7 +106,7 @@ The application automatically looks for config files in the following locations 
 
 You can also specify a custom config file:
 ```bash
-python llmd-xks-checks.py --config /path/to/config.conf
+python llmd_xks_checks.py --config /path/to/config.conf
 ```
 
 Example config file:
