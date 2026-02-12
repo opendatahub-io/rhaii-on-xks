@@ -123,40 +123,6 @@ kubectl get pods -n opendatahub
 kubectl get llminferenceserviceconfig -n opendatahub
 ```
 
-<details>
-<summary>Manual steps (click to expand)</summary>
-
-```bash
-# Create opendatahub namespace
-kubectl create namespace opendatahub --dry-run=client -o yaml | kubectl apply -f -
-
-# Copy pull secret from istio-system (created by infrastructure deployment)
-kubectl get secret redhat-pull-secret -n istio-system -o yaml | \
-  sed 's/namespace: istio-system/namespace: opendatahub/' | \
-  kubectl apply -f -
-
-# Apply cert-manager PKI resources first (required for webhook certificates)
-kubectl apply -k "https://github.com/opendatahub-io/kserve/config/overlays/odh-test/cert-manager?ref=release-v0.15"
-kubectl wait --for=condition=Ready clusterissuer/opendatahub-ca-issuer --timeout=120s
-
-# First apply - creates CRDs and deployment (CR errors expected due to webhook)
-kustomize build "https://github.com/opendatahub-io/kserve/config/overlays/odh-xks?ref=release-v0.15" | kubectl apply --server-side --force-conflicts -f - || true
-
-# Delete webhooks to allow controller startup
-kubectl delete validatingwebhookconfiguration llminferenceservice.serving.kserve.io llminferenceserviceconfig.serving.kserve.io --ignore-not-found
-
-# Wait for controller to be ready
-kubectl wait --for=condition=Available deployment/kserve-controller-manager -n opendatahub --timeout=300s
-
-# Second apply - now webhooks work, applies CRs
-kustomize build "https://github.com/opendatahub-io/kserve/config/overlays/odh-xks?ref=release-v0.15" | kubectl apply --server-side --force-conflicts -f -
-
-# Verify LLMInferenceServiceConfig templates exist
-kubectl get llminferenceserviceconfig -n opendatahub
-```
-
-</details>
-
 ### Step 3: Set up Gateway
 
 ```bash

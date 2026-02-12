@@ -703,7 +703,7 @@ while [[ $# -gt 0 ]]; do
             done
             echo ""
             echo "Upstream guides: https://github.com/llm-d/llm-d/tree/main/guides"
-            echo "KServe docs:     https://github.com/opendatahub-io/kserve/tree/release-v0.15/docs/samples/llmisvc"
+            echo "KServe docs:     https://github.com/red-hat-data-services/kserve/tree/rhoai-3.4/docs/samples/llmisvc"
             exit 0
             ;;
         --help|-h)

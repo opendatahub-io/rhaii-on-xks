@@ -193,14 +193,14 @@ kubectl get gateway inference-gateway -n opendatahub
 
 ## Configuration Reference
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `KSERVE_NAMESPACE` | `opendatahub` | Namespace where KServe is deployed |
-| `CERT_MANAGER_NAMESPACE` | `cert-manager` | Namespace where cert-manager is deployed |
-| `CA_SECRET_NAME` | `opendatahub-ca` | Name of the CA secret |
-| `GATEWAY_NAME` | `inference-gateway` | Name of the Gateway to create |
-| `CA_BUNDLE_CONFIGMAP` | `odh-ca-bundle` | Name of the CA bundle ConfigMap |
-| `CA_MOUNT_PATH` | `/var/run/secrets/opendatahub` | Mount path for CA bundle |
+| Variable                 | Default                        | Description                              |
+|--------------------------|--------------------------------|------------------------------------------|
+| `KSERVE_NAMESPACE`       | `opendatahub`                  | Namespace where KServe is deployed       |
+| `CERT_MANAGER_NAMESPACE` | `cert-manager`                 | Namespace where cert-manager is deployed |
+| `CA_SECRET_NAME`         | `opendatahub-ca`               | Name of the CA secret                    |
+| `GATEWAY_NAME`           | `inference-gateway`            | Name of the Gateway to create            |
+| `CA_BUNDLE_CONFIGMAP`    | `odh-ca-bundle`                | Name of the CA bundle ConfigMap          |
+| `CA_MOUNT_PATH`          | `/var/run/secrets/opendatahub` | Mount path for CA bundle                 |
 
 ## Troubleshooting
 
@@ -226,6 +226,7 @@ kubectl delete pod -n opendatahub -l gateway.networking.k8s.io/gateway-name=infe
 ### Gateway not becoming Programmed
 
 Check the GatewayClass exists:
+
 ```bash
 kubectl get gatewayclass istio
 ```
@@ -233,19 +234,22 @@ kubectl get gatewayclass istio
 ### Certificate not found
 
 Ensure cert-manager issued the CA certificate:
+
 ```bash
 kubectl get certificate -n cert-manager
 kubectl get secret opendatahub-ca -n cert-manager
 ```
 
 If missing, apply the cert-manager resources:
+
 ```bash
-kubectl apply -k https://github.com/kserve/kserve/config/overlays/odh-test/cert-manager?ref=release-v0.15
+make deploy-cert-manager-pki
 ```
 
 ### Gateway pod not mounting CA
 
 Check the Gateway pod has the volume:
+
 ```bash
 kubectl get pods -n opendatahub -l gateway.networking.k8s.io/gateway-name=inference-gateway
 kubectl describe pod <pod-name> -n opendatahub | grep -A5 "Volumes:"

@@ -467,19 +467,6 @@ See the full guide: [Collecting Debug Information](./collecting-debug-informatio
 
 ## 10. Troubleshooting
 
-### 10.1 Controller Pod Stuck in ContainerCreating
-
-**Symptom:** The `kserve-controller-manager` pod remains in `ContainerCreating` state.
-
-**Cause:** The webhook certificate has not been issued by cert-manager.
-
-**Resolution:**
-
-```bash
-kubectl apply -k "https://github.com/opendatahub-io/kserve/config/overlays/odh-test/cert-manager?ref=release-v0.15"
-kubectl wait --for=condition=Ready certificate/kserve-webhook-server -n opendatahub --timeout=120s
-```
-
 ### 10.2 Gateway Pod Shows ErrImagePull
 
 **Symptom:** The Gateway pod fails with `ErrImagePull` or `ImagePullBackOff`.
