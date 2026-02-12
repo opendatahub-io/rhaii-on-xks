@@ -111,9 +111,10 @@ class LLMDXKSChecks:
         if cache and self.crds_cache is not None:
             return self.crds_cache
         crd_list = self.k8s_ext_api.list_custom_resource_definition()
+        crd_names = {crd.metadata.name for crd in crd_list.items}
         if cache:
-            self.crds_cache = {crd.metadata.name for crd in crd_list.items}
-        return {crd.metadata.name for crd in crd_list.items}
+            self.crds_cache = crd_names
+        return crd_names
 
     def _test_crds_present(self, required_crds):
         all_crds = self._get_all_crd_names()
@@ -294,7 +295,6 @@ class LLMDXKSChecks:
                     print(f"Test {test['name']} FAILED")
                     print(f"    Suggested action: {test['suggested_action']}")
                     failed_counter += 1
-                    print("Failed counter: {}".format(failed_counter))
         return failed_counter
 
 
