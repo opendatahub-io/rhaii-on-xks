@@ -64,6 +64,7 @@ HOST_KUBECONFIG=/path/to/kube/config make run
 ## Validations
 
 Suite: cluster -- Cluster readiness tests
+
 | Test name | Meaning |
 | --------- | ------- |
 | `cloud_provider` | The validation script tries to determine the cloud provider the cluster is running on. Can be overridden with `--cloud-provider` |
@@ -71,6 +72,7 @@ Suite: cluster -- Cluster readiness tests
 | `gpu_availability` | At least one supported GPU must be available on a cluster node. Availability is determined by driver presence and node labels |
 
 Suite: operators -- Operator readiness tests
+
 | Test name | Meaning |
 | --------- | ------- |
 | `crd_certmanager` | The tool checks if cert-manager CRDs are present on the cluster |
