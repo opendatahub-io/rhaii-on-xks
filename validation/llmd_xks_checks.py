@@ -84,6 +84,13 @@ class LLMDXKSChecks:
                             "result": False
                         },
                         {
+                            "name": "operator_sail",
+                            "function": self.test_operator_sail,
+                            "description": "test if the sail operator is running properly",
+                            "suggested_action": "install or verify sail operator deployment",
+                            "result": False
+                        },
+                        {
                             "name": "crd_lwsoperator",
                             "function": self.test_crd_lwsoperator,
                             "description": "test if the cluster has the lws-operator crds",
@@ -199,6 +206,14 @@ class LLMDXKSChecks:
         else:
             self.logger.warning("Missing sail-operator CRDs")
             return False
+
+    def test_operator_sail(self):
+        test_failed = False
+        if not self._deployment_ready("istio-system", "istiod"):
+            test_failed = True
+        if not self._deployment_ready("istio-system", "servicemesh-operator3"):
+            test_failed = True
+        return not test_failed
 
     def test_crd_lwsoperator(self):
         required_crds = [
