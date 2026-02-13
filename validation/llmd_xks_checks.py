@@ -175,7 +175,7 @@ class LLMDXKSChecks:
         ready = deployment.status.ready_replicas or 0
         if ready != desired:
             self.logger.warning(f"Deployment {namespace_name}/{deployment_name} has "
-                                "only {ready} replicas out of {desired} desired")
+                                f"only {ready} replicas out of {desired} desired")
             return False
         else:
             self.logger.info(f"Deployment {namespace_name}/{deployment_name} ready")
