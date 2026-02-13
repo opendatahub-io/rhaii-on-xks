@@ -99,6 +99,14 @@ class LLMDXKSChecks:
                             "optional": True
                         },
                         {
+                            "name": "operator_lws",
+                            "function": self.test_operator_lws,
+                            "description": "test if the lws-operator is running properly",
+                            "suggested_action": "install or verify lws operator deployment",
+                            "result": False,
+                            "optional": True
+                        },
+                        {
                             "name": "crd_kserve",
                             "function": self.test_crd_kserve,
                             "description": "test if the cluster has the kserve crds",
@@ -225,6 +233,12 @@ class LLMDXKSChecks:
         else:
             self.logger.warning("Missing lws-operator CRDs")
             return False
+
+    def test_operator_lws(self):
+        test_failed = False
+        if not self._deployment_ready("openshift-lws-operator", "openshift-lws-operator"):
+            test_failed = True
+        return not test_failed
 
     def test_crd_kserve(self):
         required_crds = [
