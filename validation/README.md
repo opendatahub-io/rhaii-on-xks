@@ -74,9 +74,13 @@ Suite: operators -- Operator readiness tests
 | Test name | Meaning |
 | --------- | ------- |
 | `crd_certmanager` | The tool checks if cert-manager CRDs are present on the cluster |
+| `operator_certmanager` | Check is cert-manager deployments are ready |
 | `crd_sailoperator` | The tool checks if sail-operator CRDs are present on the cluster |
+| `operator_sail` | Check if sail-operator deployments are ready |
 | `crd_lwsoperator`  | The tool checks if lws-operator CRDs are present on the cluster |
+| `operator_lws`     | Check if lws-operator deployments are ready |
 | `crd_kserve`       | The tool checks if kserve CRDs are present on the cluster |
+| `operator_kserve`  | Check if kserve-controller-manager deployment is ready |
 
 At the end, a brief report is printed with `PASSED` or `FAILED` status for each of the above tests and the suggested action the user should follow.
 
