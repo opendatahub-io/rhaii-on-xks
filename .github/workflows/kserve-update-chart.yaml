@@ -74,6 +74,9 @@ jobs:
           echo "Updated Chart.yaml:"
           grep -E '^(version|appVersion):' Chart.yaml
 
+      - name: Cleanup kserve checkout
+        run: rm -rf ./charts/kserve/kserve
+
       - name: Lint chart
         working-directory: ./charts/kserve
         run: helm lint .
@@ -88,9 +91,6 @@ jobs:
           else
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
-
-      - name: Cleanup kserve checkout
-        run: rm -rf ./charts/kserve/kserve
 
       - name: Create Pull Request
         if: steps.changes.outputs.changed == 'true'
