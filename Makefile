@@ -68,7 +68,19 @@ deploy-cert-manager-pki: check-kubeconfig deploy-opendatahub-prerequisites
 	-kubectl delete secret cert-manager-webhook-ca -n cert-manager --ignore-not-found 2>/dev/null || true
 	kubectl rollout restart deployment/cert-manager-webhook -n cert-manager
 	kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=120s
-	@sleep 5
+	@echo "Waiting for webhook CA bundle to propagate..."
+	@for i in 1 2 3 4 5 6 7 8 9 10 11 12; do \
+		if kubectl apply --dry-run=server -f ./charts/kserve/pki-prereq.yaml >/dev/null 2>&1; then \
+			echo "  Webhook ready"; \
+			break; \
+		fi; \
+		if [ $$i -eq 12 ]; then \
+			echo "ERROR: cert-manager webhook not ready after 2 minutes"; \
+			exit 1; \
+		fi; \
+		echo "  Webhook not ready yet, retrying in 10s... ($$i/12)"; \
+		sleep 10; \
+	done
 	kubectl apply -f ./charts/kserve/pki-prereq.yaml
 	kubectl wait --for=condition=Ready clusterissuer/opendatahub-ca-issuer --timeout=120s
 
@@ -116,6 +128,18 @@ status: check-kubeconfig
 	@echo ""
 	@echo "kserve config:"
 	@kubectl get llminferenceserviceconfig -n $(KSERVE_NAMESPACE) 2>/dev/null || echo "  Not deployed"
+	@echo ""
+	@echo "=== Readiness Checks ==="
+	@echo -n "cert-manager webhook: "
+	@if kubectl get deployment cert-manager-webhook -n cert-manager >/dev/null 2>&1; then \
+		if echo '{"apiVersion":"cert-manager.io/v1","kind":"ClusterIssuer","metadata":{"name":"webhook-readiness-test"},"spec":{"selfSigned":{}}}' | kubectl create -f - --dry-run=server -o yaml 2>/dev/null | grep -q 'webhook-readiness-test'; then \
+			echo "Ready"; \
+		else \
+			echo "NOT READY (webhook CA may be stale — run: kubectl delete secret cert-manager-webhook-ca -n cert-manager && kubectl rollout restart deployment/cert-manager-webhook -n cert-manager)"; \
+		fi; \
+	else \
+		echo "Not deployed"; \
+	fi
 	@echo ""
 	@echo "=== API Versions ==="
 	@echo -n "InferencePool API: "
