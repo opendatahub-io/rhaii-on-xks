@@ -346,7 +346,6 @@ class LLMDXKSChecks:
             test_failed = True
         return not test_failed
 
-
     def run(self, suite=None):
         suites = []
         if suite is None:
@@ -368,6 +367,30 @@ class LLMDXKSChecks:
                     test["result"] = False
         return None
 
+    @staticmethod
+    def _supports_color():
+        return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+
+    def _color(self, code, text):
+        if self._supports_color():
+            return f"\033[{code}m{text}\033[0m"
+        return text
+
+    def _green(self, text):
+        return self._color("32", text)
+
+    def _red(self, text):
+        return self._color("31", text)
+
+    def _yellow(self, text):
+        return self._color("33", text)
+
+    def _bold(self, text):
+        return self._color("1", text)
+
+    def _dim(self, text):
+        return self._color("2", text)
+
     def report(self, suite=None):
         suites = []
         if suite is None:
@@ -378,26 +401,51 @@ class LLMDXKSChecks:
         else:
             self.logger.debug(f"Reporting on suite {suite}")
             suites.append(suite)
+
         failed_counter = 0
         passed_counter = 0
         optional_failed_counter = 0
+        width = 50
+
+        header_line = "═" * width
+        print()
+        print(self._bold(header_line))
+        print(self._bold("  LLM-D xKS Preflight Validation Report"))
+        print(self._bold(header_line))
+
         for suite in suites:
             self.logger.debug(f"Start reporting on suite {suite}")
+            section_title = self.tests[suite]["description"].replace(" tests", "")
+            print()
+            print(self._bold(f"  {section_title}"))
+            print(self._dim("  " + "─" * (width - 2)))
+
             for test in self.tests[suite]["tests"]:
+                name = test["name"]
                 if test["result"]:
-                    print(f"Test {test['name']} PASSED")
+                    print(f"  {self._green('✓')} {name}")
                     passed_counter += 1
+                elif test.get("optional"):
+                    print(f"  {self._yellow('⊘')} {name} {self._dim('(optional)')}")
+                    optional_failed_counter += 1
                 else:
-                    if "optional" in test.keys() and test["optional"]:
-                        print(f"Test {test['name']} OPTIONAL [failed]")
-                        optional_failed_counter += 1
-                    else:
-                        print(f"Test {test['name']} FAILED")
-                        print(f"    Suggested action: {test['suggested_action']}")
-                        failed_counter += 1
-        print(f"Total PASSED {passed_counter}")
-        print(f"Total OPTIONAL FAILED {optional_failed_counter}")
-        print(f"Total FAILED {failed_counter}")
+                    print(f"  {self._red('✗')} {name}")
+                    print(f"    {self._dim('→')} {test['suggested_action']}")
+                    failed_counter += 1
+
+        parts = []
+        parts.append(self._green(f"{passed_counter} passed"))
+        parts.append(self._red(f"{failed_counter} failed"))
+        if optional_failed_counter:
+            parts.append(self._yellow(f"{optional_failed_counter} optional"))
+        summary = "  ·  ".join(parts)
+
+        print()
+        print(self._bold(header_line))
+        print(f"  Results:  {summary}")
+        print(self._bold(header_line))
+        print()
+
         return failed_counter
 
 
