@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: kuadrant-operator-controller-manager
+ namespace: {{ .Values.namespace }}
+ labels:
+  app.kubernetes.io/name: kuadrant-operator
+  app.kubernetes.io/managed-by: helm
+  control-plane: kuadrant-operator-controller-manager
+spec:
+ replicas: {{ .Values.operator.replicas }}
+ selector:
+  matchLabels:
+   control-plane: kuadrant-operator-controller-manager
+ template:
+  metadata:
+   labels:
+    control-plane: kuadrant-operator-controller-manager
+  spec:
+   serviceAccountName: {{ .Values.rbac.serviceAccountName }}
+   {{- if .Values.pullSecret.dockerConfigJson }}
+   imagePullSecrets:
+    - name: {{ .Values.pullSecret.name }}
+   {{- end }}
+   containers:
+    - name: manager
+     image: {{ .Values.operator.image.registry }}/{{ .Values.operator.image.repository }}@{{ .Values.operator.image.digest }}
+     imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+     command:
+      - /manager
+     args:
+      - --health-probe-bind-address=:8081
+      - --metrics-bind-address=:8443
+     env:
+      # Operator configuration
+      - name: OPERATOR_NAMESPACE
+       valueFrom:
+        fieldRef:
+         fieldPath: metadata.namespace
+      # Component image overrides
+      - name: RELATED_IMAGE_WASMSHIM
+       value: {{ .Values.components.wasmShim.image.registry }}/{{ .Values.components.wasmShim.image.repository }}@{{ .Values.components.wasmShim.image.digest }}
+      - name: RELATED_IMAGE_AUTHORINO_OPERATOR
+       value: {{ .Values.components.authorino.operator.image.registry }}/{{ .Values.components.authorino.operator.image.repository }}@{{ .Values.components.authorino.operator.image.digest }}
+      - name: RELATED_IMAGE_AUTHORINO
+       value: {{ .Values.components.authorino.instance.image.registry }}/{{ .Values.components.authorino.instance.image.repository }}@{{ .Values.components.authorino.instance.image.digest }}
+      - name: RELATED_IMAGE_LIMITADOR_OPERATOR
+       value: {{ .Values.components.limitador.operator.image.registry }}/{{ .Values.components.limitador.operator.image.repository }}@{{ .Values.components.limitador.operator.image.digest }}
+      - name: RELATED_IMAGE_LIMITADOR
+       value: {{ .Values.components.limitador.instance.image.registry }}/{{ .Values.components.limitador.instance.image.repository }}@{{ .Values.components.limitador.instance.image.digest }}
+      - name: RELATED_IMAGE_DNS_OPERATOR
+       value: {{ .Values.components.dns.operator.image.registry }}/{{ .Values.components.dns.operator.image.repository }}@{{ .Values.components.dns.operator.image.digest }}
+     ports:
+      - containerPort: 8443
+       name: metrics
+       protocol: TCP
+      - containerPort: 8081
+       name: health
+       protocol: TCP
+      - containerPort: 9443
+       name: webhook-server
+       protocol: TCP
+     volumeMounts:
+      - name: webhook-certs
+       mountPath: /tmp/k8s-webhook-server/serving-certs
+       readOnly: true
+     livenessProbe:
+      httpGet:
+       path: /healthz
+       port: 8081
+      initialDelaySeconds: 15
+      periodSeconds: 20
+     readinessProbe:
+      httpGet:
+       path: /readyz
+       port: 8081
+      initialDelaySeconds: 5
+      periodSeconds: 10
+     resources:
+      {{- toYaml .Values.operator.resources | nindent 12 }}
+     securityContext:
+      {{- toYaml .Values.securityContext | nindent 12 }}
+   volumes:
+    - name: webhook-certs
+     secret:
+      secretName: webhook-server-cert
+   securityContext:
+    runAsNonRoot: true
+   terminationGracePeriodSeconds: 10

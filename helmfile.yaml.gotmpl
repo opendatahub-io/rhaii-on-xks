@@ -39,6 +39,13 @@ helmfiles:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
+  # kuadrant-operator (RHCL 1.3.1)
+  - path: charts/maas/kuadrant-operator/helmfile.yaml.gotmpl
+    selectorsInherited: true
+    values:
+      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
+      - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
+
 ---
 
 {{ $kserveChart := "oci://ghcr.io/opendatahub-io/kserve-rhaii-xks" }}

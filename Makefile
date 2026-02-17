@@ -1,5 +1,5 @@
 .PHONY: deploy deploy-all undeploy undeploy-kserve status help check-kubeconfig sync clear-cache
-.PHONY: deploy-cert-manager deploy-istio deploy-lws deploy-kserve deploy-opendatahub-prerequisites deploy-cert-manager-pki
+.PHONY: deploy-cert-manager deploy-istio deploy-kuadrant deploy-lws deploy-kserve deploy-opendatahub-prerequisites deploy-cert-manager-pki
 .PHONY: test conformance
 
 HELMFILE_CACHE := $(HOME)/.cache/helmfile
@@ -12,8 +12,9 @@ help:
 	@echo "rhaii-on-xks - Infrastructure for llm-d on xKS (AKS/CoreWeave)"
 	@echo ""
 	@echo "Deploy:"
-	@echo "  make deploy              - Deploy cert-manager + istio + lws"
-	@echo "  make deploy-all          - Deploy all (cert-manager + istio + lws + kserve)"
+	@echo "  make deploy              - Deploy cert-manager + istio + kuadrant + lws"
+	@echo "  make deploy-all          - Deploy all (cert-manager + istio + kuadrant + lws + kserve)"
+	@echo "  make deploy-kuadrant     - Deploy Kuadrant/RHCL (API policies)"
 	@echo "  make deploy-kserve       - Deploy KServe"
 	@echo ""
 	@echo "Undeploy:"
@@ -39,19 +40,23 @@ sync: clear-cache
 deploy: check-kubeconfig clear-cache
 	helmfile apply --selector name=cert-manager-operator
 	helmfile apply --selector name=sail-operator
+	helmfile apply --selector name=kuadrant-operator
 	helmfile apply --selector name=lws-operator
 	@$(MAKE) status
 
-deploy-all: check-kubeconfig deploy-cert-manager deploy-istio deploy-lws deploy-kserve
+deploy-all: check-kubeconfig deploy-cert-manager deploy-istio deploy-kuadrant deploy-lws deploy-kserve
 	@$(MAKE) status
 
 deploy-cert-manager: check-kubeconfig clear-cache
 	helmfile apply --selector name=cert-manager-operator
 
-deploy-istio: check-kubeconfig clear-cache
+deploy-istio: check-kubeconfig clear-cache deploy-cert-manager
 	helmfile apply --selector name=sail-operator
 
-deploy-lws: check-kubeconfig clear-cache
+deploy-kuadrant: check-kubeconfig clear-cache deploy-istio
+	helmfile apply --selector name=kuadrant-operator
+
+deploy-lws: check-kubeconfig clear-cache deploy-cert-manager
 	helmfile apply --selector name=lws-operator
 
 deploy-opendatahub-prerequisites: check-kubeconfig
@@ -84,7 +89,7 @@ deploy-cert-manager-pki: check-kubeconfig deploy-opendatahub-prerequisites
 	kubectl apply -f ./charts/kserve/pki-prereq.yaml
 	kubectl wait --for=condition=Ready clusterissuer/opendatahub-ca-issuer --timeout=120s
 
-deploy-kserve: check-kubeconfig deploy-cert-manager-pki
+deploy-kserve: check-kubeconfig deploy-cert-manager-pki deploy-istio deploy-lws
 	@echo "Applying KServe via Helm..."
 	helmfile sync --wait --selector name=kserve-rhaii-xks --skip-crds
 	@echo "=== KServe deployed ==="
@@ -119,6 +124,9 @@ status: check-kubeconfig
 	@echo ""
 	@echo "istio:"
 	@kubectl get pods -n istio-system 2>/dev/null || echo "  Not deployed"
+	@echo ""
+	@echo "kuadrant:"
+	@kubectl get pods -n kuadrant-system 2>/dev/null || echo "  Not deployed"
 	@echo ""
 	@echo "lws-operator:"
 	@kubectl get pods -n openshift-lws-operator 2>/dev/null || echo "  Not deployed"

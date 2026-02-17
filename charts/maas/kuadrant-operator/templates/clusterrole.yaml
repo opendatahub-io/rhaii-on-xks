@@ -1,0 +1,209 @@
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+ name: kuadrant-operator
+ labels:
+  app.kubernetes.io/name: kuadrant-operator
+  app.kubernetes.io/managed-by: helm
+rules:
+ # Kuadrant CR management
+ - apiGroups:
+   - kuadrant.io
+  resources:
+   - "*"
+  verbs:
+   - "*"
+ # Kuadrant extension policies
+ - apiGroups:
+   - extensions.kuadrant.io
+  resources:
+   - oidcpolicies
+   - planpolicies
+   - telemetrypolicies
+  verbs:
+   - "*"
+ # Authorino operator management
+ - apiGroups:
+   - operator.authorino.kuadrant.io
+  resources:
+   - "*"
+  verbs:
+   - "*"
+ # Limitador operator management
+ - apiGroups:
+   - limitador.kuadrant.io
+  resources:
+   - "*"
+  verbs:
+   - "*"
+ # Gateway API resources
+ - apiGroups:
+   - gateway.networking.k8s.io
+  resources:
+   - gateways
+   - httproutes
+   - gatewayclasses
+  verbs:
+   - get
+   - list
+   - watch
+   - update
+   - patch
+ # cert-manager integration
+ - apiGroups:
+   - cert-manager.io
+  resources:
+   - certificates
+   - issuers
+   - clusterissuers
+  verbs:
+   - get
+   - list
+   - watch
+   - create
+   - update
+   - patch
+   - delete
+ # Core resources
+ - apiGroups:
+   - ""
+  resources:
+   - services
+   - endpoints
+   - pods
+   - configmaps
+   - secrets
+   - serviceaccounts
+  verbs:
+   - get
+   - list
+   - watch
+   - create
+   - update
+   - patch
+   - delete
+ # Deployments and StatefulSets
+ - apiGroups:
+   - apps
+  resources:
+   - deployments
+   - statefulsets
+  verbs:
+   - get
+   - list
+   - watch
+   - create
+   - update
+   - patch
+   - delete
+ # RBAC
+ - apiGroups:
+   - rbac.authorization.k8s.io
+  resources:
+   - roles
+   - rolebindings
+  verbs:
+   - get
+   - list
+   - watch
+   - create
+   - update
+   - patch
+   - delete
+ - apiGroups:
+   - rbac.authorization.k8s.io
+  resources:
+   - clusterroles
+   - clusterrolebindings
+  verbs:
+   - get
+   - list
+   - watch
+   - create
+   - update
+   - patch
+ # CRDs
+ - apiGroups:
+   - apiextensions.k8s.io
+  resources:
+   - customresourcedefinitions
+  verbs:
+   - get
+   - list
+   - watch
+ # Events
+ - apiGroups:
+   - ""
+  resources:
+   - events
+  verbs:
+   - create
+   - patch
+ # Webhooks
+ - apiGroups:
+   - admissionregistration.k8s.io
+  resources:
+   - validatingwebhookconfigurations
+   - mutatingwebhookconfigurations
+  verbs:
+   - get
+   - list
+   - watch
+   - create
+   - update
+   - patch
+   - delete
+ # PodDisruptionBudgets (required by limitador-operator)
+ - apiGroups:
+   - policy
+  resources:
+   - poddisruptionbudgets
+  verbs:
+   - get
+   - list
+   - watch
+   - create
+   - update
+   - patch
+   - delete
+ # Istio networking resources (required by kuadrant-operator)
+ - apiGroups:
+   - networking.istio.io
+  resources:
+   - envoyfilters
+  verbs:
+   - get
+   - list
+   - watch
+   - create
+   - update
+   - patch
+   - delete
+ # Istio extensions resources (required by kuadrant-operator)
+ - apiGroups:
+   - extensions.istio.io
+  resources:
+   - wasmplugins
+  verbs:
+   - get
+   - list
+   - watch
+   - create
+   - update
+   - patch
+   - delete
+ # Istio security resources (required by kuadrant-operator)
+ - apiGroups:
+   - security.istio.io
+  resources:
+   - peerauthentications
+  verbs:
+   - get
+   - list
+   - watch
+   - create
+   - update
+   - patch
+   - delete
+{{- end }}

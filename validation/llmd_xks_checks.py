@@ -107,6 +107,22 @@ class LLMDXKSChecks:
                             "optional": True
                         },
                         {
+                            "name": "crd_kuadrant",
+                            "function": self.test_crd_kuadrant,
+                            "description": "test if the cluster has the kuadrant/RHCL crds",
+                            "suggested_action": "install kuadrant-operator",
+                            "result": False,
+                            "optional": False
+                        },
+                        {
+                            "name": "operator_kuadrant",
+                            "function": self.test_operator_kuadrant,
+                            "description": "test if the kuadrant operators are running properly",
+                            "suggested_action": "install or verify kuadrant operator deployment",
+                            "result": False,
+                            "optional": False
+                        },
+                        {
                             "name": "crd_kserve",
                             "function": self.test_crd_kserve,
                             "description": "test if the cluster has the kserve crds",
@@ -244,6 +260,60 @@ class LLMDXKSChecks:
     def test_operator_lws(self):
         test_failed = False
         if not self._deployment_ready("openshift-lws-operator", "openshift-lws-operator"):
+            test_failed = True
+        return not test_failed
+
+    def test_crd_kuadrant(self):
+        """
+        Validate that all required Kuadrant/RHCL CRDs are installed.
+
+        Checks for 13 CRDs including core policies (auth, rate limiting, DNS, TLS),
+        operator resources (Kuadrant, Authorino, Limitador), and extension policies
+        (token rate limiting, OIDC, plan, telemetry).
+
+        Returns:
+            bool: True if all Kuadrant CRDs are present, False otherwise.
+        """
+        required_crds = [
+            "authpolicies.kuadrant.io",
+            "ratelimitpolicies.kuadrant.io",
+            "dnspolicies.kuadrant.io",
+            "tlspolicies.kuadrant.io",
+            "kuadrants.kuadrant.io",
+            "dnsrecords.kuadrant.io",
+            "dnshealthcheckprobes.kuadrant.io",
+            "limitadors.limitador.kuadrant.io",
+            "authorinos.operator.authorino.kuadrant.io",
+            "tokenratelimitpolicies.kuadrant.io",
+            "oidcpolicies.extensions.kuadrant.io",
+            "planpolicies.extensions.kuadrant.io",
+            "telemetrypolicies.extensions.kuadrant.io",
+        ]
+        if self._test_crds_present(required_crds):
+            self.logger.info("All required kuadrant/RHCL CRDs are present")
+            return True
+        else:
+            self.logger.warning("Missing kuadrant/RHCL CRDs")
+            return False
+
+    def test_operator_kuadrant(self):
+        """
+        Validate that all Kuadrant operator deployments are ready.
+
+        Checks that the main Kuadrant operator and its three child operators
+        (Authorino, Limitador, DNS) are deployed and ready in the kuadrant-system namespace.
+
+        Returns:
+            bool: True if all four operator deployments are ready, False otherwise.
+        """
+        test_failed = False
+        if not self._deployment_ready("kuadrant-system", "kuadrant-operator-controller-manager"):
+            test_failed = True
+        if not self._deployment_ready("kuadrant-system", "authorino-operator-controller-manager"):
+            test_failed = True
+        if not self._deployment_ready("kuadrant-system", "limitador-operator-controller-manager"):
+            test_failed = True
+        if not self._deployment_ready("kuadrant-system", "dns-operator-controller-manager"):
             test_failed = True
         return not test_failed
 

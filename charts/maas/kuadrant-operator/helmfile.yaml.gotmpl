@@ -1,0 +1,84 @@
+# Red Hat Connectivity Link (RHCL) Helmfile
+# Deployed via the root helmfile
+
+environments:
+ default:
+  values:
+   - values.yaml
+
+---
+
+helmDefaults:
+ wait: true
+ timeout: 600
+
+releases:
+ - name: kuadrant-operator
+  namespace: {{ .Values.namespace }}
+  createNamespace: true
+  chart: ./
+  disableValidationOnInstall: true
+  values:
+   - values.yaml
+{{- if .Values.useSystemPodmanAuth }}
+  set:
+   - name: pullSecret.dockerConfigJson
+    file: {{ env "HOME" }}/.config/containers/auth.json
+{{- else if or .Values.pullSecretFile .Values.authFile }}
+  set:
+   - name: pullSecret.dockerConfigJson
+    file: {{ .Values.pullSecretFile | default .Values.authFile }}
+{{- end }}
+  hooks:
+   # Verify Gateway API CRDs are installed
+   - events: ["presync"]
+    showlogs: true
+    command: "bash"
+    args:
+     - -c
+     - |
+      if ! kubectl get crd gateways.gateway.networking.k8s.io &>/dev/null; then
+       echo "ERROR: Gateway API CRDs not found"
+       echo "Install Gateway API first: kubectl apply -k https://github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.4.0"
+       exit 1
+      fi
+      echo "Gateway API CRDs found"
+   # Verify cert-manager is installed
+   - events: ["presync"]
+    showlogs: true
+    command: "bash"
+    args:
+     - -c
+     - |
+      if ! kubectl get deployment cert-manager -n cert-manager &>/dev/null; then
+       echo "ERROR: cert-manager not found (required for webhook certificates)"
+       exit 1
+      fi
+      echo "cert-manager found"
+   # Verify Gateway controller is installed (Istio or Envoy Gateway)
+   - events: ["presync"]
+    showlogs: true
+    command: "bash"
+    args:
+     - -c
+     - |
+      if kubectl get gatewayclass istio &>/dev/null; then
+       echo "Gateway controller found: Istio"
+      elif kubectl get gatewayclass envoy-gateway &>/dev/null; then
+       echo "Gateway controller found: Envoy Gateway"
+      else
+       echo "ERROR: No Gateway controller found (istio or envoy-gateway)"
+       echo "Install Istio first: helmfile apply --selector name=sail-operator"
+       exit 1
+      fi
+   # Wait for Kuadrant CR to be ready
+   - events: ["postsync"]
+    showlogs: true
+    command: "bash"
+    args:
+     - -c
+     - |
+      echo "Waiting for Kuadrant CR to be ready (timeout: 5 minutes)..."
+      kubectl wait --for=condition=Ready kuadrant/{{ .Values.kuadrant.name }} \
+       -n {{ .Values.namespace }} --timeout=300s
+      echo "Deployment complete"

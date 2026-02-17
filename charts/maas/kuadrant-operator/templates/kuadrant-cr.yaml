@@ -1,0 +1,11 @@
+{{- if .Values.kuadrant.enabled }}
+apiVersion: kuadrant.io/v1beta1
+kind: Kuadrant
+metadata:
+ name: {{ .Values.kuadrant.name }}
+ namespace: {{ .Values.namespace }}
+ labels:
+  app.kubernetes.io/name: kuadrant
+  app.kubernetes.io/managed-by: helm
+spec: {}
+{{- end }}

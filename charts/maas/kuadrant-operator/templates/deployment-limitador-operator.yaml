@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: limitador-operator-controller-manager
+ namespace: {{ .Values.namespace }}
+ labels:
+  app.kubernetes.io/name: limitador-operator
+  app.kubernetes.io/managed-by: helm
+  control-plane: limitador-operator-controller-manager
+spec:
+ replicas: 1
+ selector:
+  matchLabels:
+   control-plane: limitador-operator-controller-manager
+ template:
+  metadata:
+   labels:
+    control-plane: limitador-operator-controller-manager
+  spec:
+   serviceAccountName: {{ .Values.rbac.serviceAccountName }}
+   {{- if .Values.pullSecret.dockerConfigJson }}
+   imagePullSecrets:
+    - name: {{ .Values.pullSecret.name }}
+   {{- end }}
+   containers:
+   - name: manager
+     image: {{ .Values.components.limitador.operator.image.registry }}/{{ .Values.components.limitador.operator.image.repository }}@{{ .Values.components.limitador.operator.image.digest }}
+     imagePullPolicy: IfNotPresent
+     command:
+     - /manager
+     args:
+     - --health-probe-bind-address=:8081
+     - --metrics-bind-address=:8080
+     env:
+     - name: WATCH_NAMESPACE
+       value: ""
+     - name: RELATED_IMAGE_LIMITADOR
+       value: {{ .Values.components.limitador.instance.image.registry }}/{{ .Values.components.limitador.instance.image.repository }}@{{ .Values.components.limitador.instance.image.digest }}
+     ports:
+     - containerPort: 8080
+       name: metrics
+       protocol: TCP
+     - containerPort: 8081
+       name: health
+       protocol: TCP
+     livenessProbe:
+       httpGet:
+         path: /healthz
+         port: 8081
+       initialDelaySeconds: 15
+       periodSeconds: 20
+     readinessProbe:
+       httpGet:
+         path: /readyz
+         port: 8081
+       initialDelaySeconds: 5
+       periodSeconds: 10
+     resources:
+       limits:
+         cpu: 500m
+         memory: 512Mi
+       requests:
+         cpu: 10m
+         memory: 64Mi
+     securityContext:
+       {{- toYaml .Values.securityContext | nindent 12 }}
+   securityContext:
+    runAsNonRoot: true
+   terminationGracePeriodSeconds: 10

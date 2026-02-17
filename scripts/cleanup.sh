@@ -109,11 +109,17 @@ done
 # Infrastructure stub CRD
 kubectl delete crd infrastructures.config.openshift.io --ignore-not-found 2>/dev/null || true
 
+# Kuadrant CRDs (Kuadrant/RHCL)
+echo "$CRDS" | grep -E "kuadrant\.io|limitador\.kuadrant\.io|authorino\.kuadrant\.io" | while read -r crd; do
+    kubectl delete "$crd" --ignore-not-found 2>/dev/null || true
+done
+
 # Clean up presync-created namespaces
 log "Cleaning up namespaces..."
 kubectl delete namespace cert-manager --ignore-not-found --wait=false 2>/dev/null || true
 kubectl delete namespace cert-manager-operator --ignore-not-found --wait=false 2>/dev/null || true
 kubectl delete namespace istio-system --ignore-not-found --wait=false 2>/dev/null || true
+kubectl delete namespace kuadrant-system --ignore-not-found --wait=false 2>/dev/null || true
 kubectl delete namespace openshift-lws-operator --ignore-not-found --wait=false 2>/dev/null || true
 kubectl delete namespace opendatahub --ignore-not-found --wait=false 2>/dev/null || true
 

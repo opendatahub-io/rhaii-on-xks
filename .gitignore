@@ -1,0 +1,19 @@
+# IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Helm
+Chart.lock
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

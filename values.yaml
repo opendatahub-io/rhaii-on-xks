@@ -27,6 +27,12 @@ sailOperator:
 lwsOperator:
   enabled: true
 
+# kuadrant-operator / RHCL (required for API policies)
+# Red Hat Connectivity Link 1.2.0 - API authentication, rate limiting, DNS
+kuadrantOperator:
+  enabled: true
+  namespace: kuadrant-system
+
 # =============================================================================
 # KServe
 # =============================================================================
