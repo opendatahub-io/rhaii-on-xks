@@ -7,6 +7,22 @@ RUN source /etc/os-release && \
 
 RUN dnf install -y python3-configargparse python3-kubernetes python3-pip python3-build
 
+# Install Google Cloud SDK for GKE authentication
+# Add Google Cloud SDK repository (dynamically choose repo suffix based on platform)
+RUN source /etc/os-release && \
+    GCLOUD_REPO_SUFFIX="el9" && \
+    if [ "${PLATFORM_ID}" == "platform:el10" ]; then GCLOUD_REPO_SUFFIX="el10"; fi && \
+    if [ -z "${PLATFORM_ID##*fedora*}" ]; then GCLOUD_REPO_SUFFIX="el9"; fi && \
+    printf '[google-cloud-cli]\n\
+name=Google Cloud CLI\n\
+baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-%s-x86_64\n\
+enabled=1\n\
+gpgcheck=1\n\
+repo_gpgcheck=0\n\
+gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg\n' "$GCLOUD_REPO_SUFFIX" \
+> /etc/yum.repos.d/google-cloud-sdk.repo && \
+dnf install -y google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
+
 COPY . /root/src
 RUN python3 -m build /root/src -w -o /root/src && python3 -m pip install --no-deps /root/src/*.whl && rm -rf /root/src
 

@@ -1,10 +1,12 @@
 # LLM-D xKS Preflight Validation Checks
 
-A CLI application for running validation checks against Kubernetes clusters in the context of Red Hat AI Inference Server (KServe LLMInferenceService) on managed Kubernetes platforms (AKS, CoreWeave etc.). The tool connects to a running Kubernetes cluster, detects the cloud provider, and executes a series of validation tests to ensure the cluster is properly configured and ready for use.
+A CLI application for running validation checks against Kubernetes clusters in the context of Red Hat AI Inference Server (KServe LLMInferenceService) on managed Kubernetes platforms (AKS, GKE, CoreWeave, etc.). The tool connects to a running Kubernetes cluster, detects the cloud provider, and executes a series of validation tests to ensure the cluster is properly configured and ready for use.
 
 ## Features
 
-- **Cloud Provider Detection**: Automatically detects cloud provider (Azure, AWS) or allows manual specification
+- **Cloud Provider Detection**: Automatically detects cloud provider (Azure, GCP, AWS) or allows manual specification
+- **Multi-Cloud Support**: Extensible architecture supports Azure AKS and Google Cloud GKE
+- **TPU Support**: Validates Google Cloud TPU availability and zone compatibility (GKE)
 - **Configurable Logging**: Adjustable log levels for debugging and monitoring
 - **Flexible Configuration**: Supports command-line arguments, config files, and environment variables
 - **Test Framework**: Extensible test execution framework for preflight validations
@@ -15,6 +17,7 @@ A CLI application for running validation checks against Kubernetes clusters in t
 | Cloud provider | Managed K8s Service |
 | -------------- | ------------------- |
 | [Azure](https://azure.microsoft.com) | [AKS](https://azure.microsoft.com/en-us/products/kubernetes-service) |
+| [Google Cloud](https://cloud.google.com) | [GKE](https://cloud.google.com/kubernetes-engine) |
 
 
 ## Container image build
@@ -93,6 +96,94 @@ At the end, a brief report is printed with `PASSED` or `FAILED` status for each 
 - `Standard_ND96isr_H100_v5` (NVIDIA H100)
 - `Standard_ND96isr_H200_v5` (NVIDIA H200)
 
+**GCP Supported Machine Families**:
+
+TPU Machine Families:
+- `ct6e` (TPU v6e - Trillium)
+- `ct5e` (TPU v5e)
+- `ct5p` (TPU v5p)
+
+GPU Machine Families:
+- `n1` (NVIDIA T4, K80)
+- `a2` (NVIDIA A100)
+- `g2` (NVIDIA L4)
+- `a3` (NVIDIA H100)
+
+## GKE-Specific Validation
+
+When validating GKE clusters, the tool performs additional checks:
+
+### Accelerator Types
+
+**GPU Validation**:
+- Checks for `nvidia.com/gpu` resource allocation
+- Validates `cloud.google.com/gke-accelerator` label (GPU type)
+- Supported GPUs: T4, A100, L4, H100
+
+**TPU Validation**:
+- Checks for `google.com/tpu` resource allocation
+- Validates `cloud.google.com/gke-tpu-accelerator` label (TPU type)
+- Validates `cloud.google.com/gke-tpu-topology` label (chip layout)
+- Supported TPUs: v6e (Trillium), v5e, v5p
+
+### Zone Compatibility (Optional)
+
+For GKE, the tool includes an optional `zone_compatibility` test that validates accelerators are deployed in known-good availability zones. This check uses zone data last updated in February 2026 covering 100+ zones across:
+
+- **TPU v6e**: 9 zones (US, Europe, Asia, South America)
+- **TPU v5e**: 5 zones
+- **TPU v5p**: 3 zones
+- **GPU T4**: 22 zones
+- **GPU A100**: 13 zones
+- **GPU L4**: 13 zones
+- **GPU H100**: 8 zones
+
+This test is marked as optional and warns if accelerators are found in zones not in the validated list.
+
+### Quick Start (GKE)
+
+**Prerequisites for GKE**: Ensure you're authenticated with gcloud:
+```bash
+gcloud auth login
+gcloud container clusters get-credentials <cluster-name> --zone <zone>
+```
+
+The container automatically mounts `~/.config/gcloud` for GKE authentication.
+
+```bash
+# Run all validation checks (auto-detect GCP)
+cd validation
+make container
+make run
+
+# Explicitly specify GCP
+make run-gke
+
+# Run specific suites
+make run SUITE=cluster
+make run SUITE=operators
+
+# Debug mode
+make run-gke-debug
+```
+
+### Testing with TPU Cluster
+
+```bash
+# Connect to your GKE TPU cluster
+gcloud container clusters get-credentials <cluster-name> --zone <zone>
+
+# Run validation
+cd validation
+python llmd_xks_checks.py --cloud-provider gcp --log-level DEBUG
+
+# Expected output for TPU cluster:
+# ✓ Cloud provider: gcp
+# ✓ Found supported machine types: ct6e-standard-4t on node-xyz
+# ✓ TPU available on: node-xyz (v6e-slice, topology: 2x2: 4 chips)
+# ✓ All accelerators in validated zones (optional)
+# ✓ All operator CRDs and deployments ready
+```
 
 ## Standalone script usage
 
@@ -104,7 +195,7 @@ Required dependencies:
 
 - `-l, --log-level`: Set the log level (choices: DEBUG, INFO, WARNING, ERROR, CRITICAL, default: INFO)
 - `-k, --kube-config`: Path to the kubeconfig file (overrides KUBECONFIG environment variable)
-- `-u, --cloud-provider`: Cloud provider to perform checks on (choices: auto, azure, default: auto)
+- `-u, --cloud-provider`: Cloud provider to perform checks on (choices: auto, azure, gcp, default: auto)
 - `-c, --config`: Path to a custom config file
 - `-s, --suite`: Test suite to run (choices: all, cluster, operators, default: all)
 - `-h, --help`: Show help message
@@ -126,10 +217,13 @@ Example config file:
 log_level = INFO
 kube_config = /path/to/kubeconfig
 cloud_provider = azure
+# or for GKE:
+# cloud_provider = gcp
 ```
 
 ### Environment Variables
 
 - `LLMD_XKS_LOG_LEVEL`: Log level (same choices as `--log-level`)
-- `LLMD_XKS_CLOUD_PROVIDER`: Cloud provider (choices: auto, azure)
+- `LLMD_XKS_CLOUD_PROVIDER`: Cloud provider (choices: auto, azure, gcp)
+- `LLMD_XKS_SUITE`: Test suite to run (choices: all, cluster, operators)
 - `KUBECONFIG`: Path to kubeconfig file (standard Kubernetes environment variable)

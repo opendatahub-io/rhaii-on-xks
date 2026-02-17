@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llmd-xks-preflight"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
   { name="Costin Gamenț", email="cos@redhat.com" },
 ]
@@ -26,7 +26,7 @@ dependencies = [
 "Bug Tracker" = "https://github.com/kwozyman/llmd-xks-preflight/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["llmd_xks_checks.py"]
+packages = ["llmd_xks_checks.py", "cloud_providers.py"]
 
 [project.scripts]
 llmd-xks-preflight = "llmd_xks_checks:main"

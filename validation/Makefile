@@ -6,7 +6,7 @@ CONTAINER_TOOL ?= podman
 HOST_KUBECONFIG ?= ~/.kube/config
 FROM ?= registry.fedoraproject.org/fedora:latest
 
-.PHONY: help container run push lint pep8-fix
+.PHONY: help container run push lint pep8-fix run-gke run-gke-debug
 
 help:
 	@echo "Available targets:"
@@ -14,6 +14,8 @@ help:
 	@echo "  run           Run the container image with all tests"
 	@echo "  run-cluster   Run the container image with cluster readiness tests"
 	@echo "  run-operators Run the container image with operators readiness tests"
+	@echo "  run-gke       Run the container image with GCP/GKE cloud provider"
+	@echo "  run-gke-debug Run the container image with GCP/GKE in debug mode"
 	@echo "  push          Push the container image to the container registry"
 	@echo "  lint          Check code for PEP8 compliance"
 	@echo "  pep8-fix      Automatically fix PEP8 compliance issues"
@@ -33,15 +35,24 @@ container:
 
 # Run the container image with all tests
 run:
-	$(CONTAINER_TOOL) run --rm -it --volume $(HOST_KUBECONFIG):/root/.kube/config:ro,Z $(CONTAINER_REPO):$(CONTAINER_TAG)
+	$(CONTAINER_TOOL) run --rm -it \
+		--volume $(HOST_KUBECONFIG):/root/.kube/config:ro,Z \
+		--volume ~/.config/gcloud:/root/.config/gcloud:z \
+		$(CONTAINER_REPO):$(CONTAINER_TAG)
 
 # Run the container image with cluster readiness tests
 run-cluster:
-	$(CONTAINER_TOOL) run --rm -it --volume $(HOST_KUBECONFIG):/root/.kube/config:ro,Z $(CONTAINER_REPO):$(CONTAINER_TAG) -s cluster
+	$(CONTAINER_TOOL) run --rm -it \
+		--volume $(HOST_KUBECONFIG):/root/.kube/config:ro,Z \
+		--volume ~/.config/gcloud:/root/.config/gcloud:z \
+		$(CONTAINER_REPO):$(CONTAINER_TAG) -s cluster
 
 # Run the container image with operators readiness tests
 run-operators:
-	$(CONTAINER_TOOL) run --rm -it --volume $(HOST_KUBECONFIG):/root/.kube/config:ro,Z $(CONTAINER_REPO):$(CONTAINER_TAG) -s operators
+	$(CONTAINER_TOOL) run --rm -it \
+		--volume $(HOST_KUBECONFIG):/root/.kube/config:ro,Z \
+		--volume ~/.config/gcloud:/root/.config/gcloud:z \
+		$(CONTAINER_REPO):$(CONTAINER_TAG) -s operators
 
 
 # Push the container image to the container registry
@@ -55,3 +66,17 @@ lint:
 # Automatically fix PEP8 compliance issues
 pep8-fix:
 	autopep8 --max-line-length=$(MAX_LINE_LENGTH) --in-place --recursive .
+
+# Run the container image with GCP/GKE cloud provider
+run-gke:
+	$(CONTAINER_TOOL) run --rm -it \
+		--volume $(HOST_KUBECONFIG):/root/.kube/config:ro,Z \
+		--volume ~/.config/gcloud:/root/.config/gcloud:z \
+		$(CONTAINER_REPO):$(CONTAINER_TAG) -u gcp
+
+# Run the container image with GCP/GKE in debug mode
+run-gke-debug:
+	$(CONTAINER_TOOL) run --rm -it \
+		--volume $(HOST_KUBECONFIG):/root/.kube/config:ro,Z \
+		--volume ~/.config/gcloud:/root/.config/gcloud:z \
+		$(CONTAINER_REPO):$(CONTAINER_TAG) -u gcp -l DEBUG

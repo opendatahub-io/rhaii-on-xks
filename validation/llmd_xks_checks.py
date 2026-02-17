@@ -8,6 +8,7 @@ import sys
 import logging
 import os
 import kubernetes  # pyright: ignore[reportMissingImports]
+from cloud_providers import BaseCloudProvider, AzureProvider, GCPProvider
 
 
 class LLMDXKSChecks:
@@ -28,102 +29,23 @@ class LLMDXKSChecks:
             self.logger.error("Failed to connect to Kubernetes cluster")
             sys.exit(1)
 
+        # Initialize cloud provider
         if self.cloud_provider == "auto":
-            self.cloud_provider = self.detect_cloud_provider()
-            if self.cloud_provider == "none":
-                self.logger.error("Failed to detect cloud provider")
-                sys.exit(2)
-            self.logger.info(f"Cloud provider detected: {self.cloud_provider}")
+            self.provider = self._detect_provider()
+        elif self.cloud_provider == "azure":
+            self.provider = AzureProvider(self.k8s_client, self.logger)
+        elif self.cloud_provider == "gcp":
+            self.provider = GCPProvider(self.k8s_client, self.logger)
         else:
-            self.logger.info(f"Cloud provider specified: {self.cloud_provider}")
+            self.logger.error(f"Unsupported cloud provider: {self.cloud_provider}")
+            sys.exit(2)
+
+        self.logger.info(f"Cloud provider: {self.cloud_provider}")
 
         self.crds_cache = None
 
-        self.tests = {
-                "cluster": {
-                    "description": "Cluster readiness tests",
-                    "tests": [
-                        {
-                            "name": "instance_type",
-                            "function": self.test_instance_type,
-                            "description": "Test if the cluster has at least one supported instance type",
-                            "suggested_action": "Provision a cluster with at least one supported instance type",
-                            "result": False
-                        },
-                        {
-                            "name": "gpu_availability",
-                            "function": self.test_gpu_availability,
-                            "description": "Test if the cluster has GPU drivers",
-                            "suggested_action": "Provision a cluster with at least one supported GPU driver",
-                            "result": False
-                        },
-                        ]
-                    },
-                "operators": {
-                    "description": "Operators readiness tests",
-                    "tests": [
-                        {
-                            "name": "crd_certmanager",
-                            "function": self.test_crd_certmanager,
-                            "description": "test if the cluster has the cert-manager crds",
-                            "suggested_action": "install cert-manager",
-                            "result": False
-                        },
-                        {
-                            "name": "operator_certmanager",
-                            "function": self.test_operator_certmanager,
-                            "description": "test if the cert-manager operator is running properly",
-                            "suggested_action": "install or verify cert-manager deployment",
-                            "result": False
-                        },
-                        {
-                            "name": "crd_sailoperator",
-                            "function": self.test_crd_sailoperator,
-                            "description": "test if the cluster has the sailoperator crds",
-                            "suggested_action": "install sail-operator",
-                            "result": False
-                        },
-                        {
-                            "name": "operator_sail",
-                            "function": self.test_operator_sail,
-                            "description": "test if the sail operator is running properly",
-                            "suggested_action": "install or verify sail operator deployment",
-                            "result": False
-                        },
-                        {
-                            "name": "crd_lwsoperator",
-                            "function": self.test_crd_lwsoperator,
-                            "description": "test if the cluster has the lws-operator crds",
-                            "suggested_action": "install lws-operator",
-                            "result": False,
-                            "optional": True
-                        },
-                        {
-                            "name": "operator_lws",
-                            "function": self.test_operator_lws,
-                            "description": "test if the lws-operator is running properly",
-                            "suggested_action": "install or verify lws operator deployment",
-                            "result": False,
-                            "optional": True
-                        },
-                        {
-                            "name": "crd_kserve",
-                            "function": self.test_crd_kserve,
-                            "description": "test if the cluster has the kserve crds",
-                            "suggested_action": "install kserve",
-                            "result": False,
-                            "optional": False
-                        },
-                        {
-                            "name": "operator_kserve",
-                            "function": self.test_operator_kserve,
-                            "description": "test if the kserve controller is running properly",
-                            "suggested_action": "install or verify kserve deployment",
-                            "result": False,
-                        },
-                    ]
-                    }
-            }
+        # Build test registry with provider-specific tests
+        self.tests = self._build_test_registry()
 
     def _log_init(self):
         logger = logging.getLogger(__name__)
@@ -143,6 +65,160 @@ class LLMDXKSChecks:
             return None
         self.logger.info("Kubernetes connection established")
         return client
+
+    def _detect_provider(self) -> BaseCloudProvider:
+        """
+        Auto-detect cloud provider from node labels.
+
+        Returns:
+            BaseCloudProvider: Detected provider instance
+
+        Exits with code 2 if no provider detected.
+        """
+        for provider_class in [AzureProvider, GCPProvider]:
+            provider = provider_class(self.k8s_client, self.logger)
+            if provider.detect():
+                provider_name = provider_class.__name__.replace("Provider", "").lower()
+                self.logger.info(f"Detected cloud provider: {provider_name}")
+                self.cloud_provider = provider_name
+                return provider
+
+        self.logger.error("Failed to detect cloud provider")
+        sys.exit(2)
+
+    def _build_test_registry(self) -> dict:
+        """
+        Build test registry with provider-specific and cloud-agnostic tests.
+
+        Returns:
+            dict: Test registry structure with cluster and operator tests
+        """
+        tests = {
+            "cluster": {
+                "description": "Cluster readiness tests",
+                "tests": [
+                    {
+                        "name": "instance_type",
+                        "function": self._test_provider_instance_types,
+                        "description": "Validate machine/instance types for cloud provider",
+                        "suggested_action": "Provision cluster with supported instance types",
+                        "result": False
+                    },
+                    {
+                        "name": "accelerators",
+                        "function": self._test_provider_accelerators,
+                        "description": "Validate GPU/TPU availability",
+                        "suggested_action": "Provision cluster with supported accelerators",
+                        "result": False
+                    }
+                ]
+            },
+            "operators": {
+                "description": "Operators readiness tests",
+                "tests": [
+                    {
+                        "name": "crd_certmanager",
+                        "function": self.test_crd_certmanager,
+                        "description": "test if the cluster has the cert-manager crds",
+                        "suggested_action": "install cert-manager",
+                        "result": False
+                    },
+                    {
+                        "name": "operator_certmanager",
+                        "function": self.test_operator_certmanager,
+                        "description": "test if the cert-manager operator is running properly",
+                        "suggested_action": "install or verify cert-manager deployment",
+                        "result": False
+                    },
+                    {
+                        "name": "crd_sailoperator",
+                        "function": self.test_crd_sailoperator,
+                        "description": "test if the cluster has the sailoperator crds",
+                        "suggested_action": "install sail-operator",
+                        "result": False
+                    },
+                    {
+                        "name": "operator_sail",
+                        "function": self.test_operator_sail,
+                        "description": "test if the sail operator is running properly",
+                        "suggested_action": "install or verify sail operator deployment",
+                        "result": False
+                    },
+                    {
+                        "name": "crd_lwsoperator",
+                        "function": self.test_crd_lwsoperator,
+                        "description": "test if the cluster has the lws-operator crds",
+                        "suggested_action": "install lws-operator",
+                        "result": False,
+                        "optional": True
+                    },
+                    {
+                        "name": "operator_lws",
+                        "function": self.test_operator_lws,
+                        "description": "test if the lws-operator is running properly",
+                        "suggested_action": "install or verify lws operator deployment",
+                        "result": False,
+                        "optional": True
+                    },
+                    {
+                        "name": "crd_kserve",
+                        "function": self.test_crd_kserve,
+                        "description": "test if the cluster has the kserve crds",
+                        "suggested_action": "install kserve",
+                        "result": False
+                    },
+                    {
+                        "name": "operator_kserve",
+                        "function": self.test_operator_kserve,
+                        "description": "test if the kserve controller is running properly",
+                        "suggested_action": "install or verify kserve deployment",
+                        "result": False
+                    }
+                ]
+            }
+        }
+
+        # Add GCP-specific zone validation (optional test)
+        if isinstance(self.provider, GCPProvider):
+            tests["cluster"]["tests"].append({
+                "name": "zone_compatibility",
+                "function": self._test_zone_compatibility,
+                "description": "Validate accelerators in known-good zones (GCP)",
+                "suggested_action": "Deploy to recommended zones for better availability",
+                "result": False,
+                "optional": True
+            })
+
+        return tests
+
+    def _test_provider_instance_types(self) -> bool:
+        """Delegate instance type validation to provider."""
+        success, message = self.provider.validate_instance_types()
+        if success:
+            self.logger.info(message)
+        else:
+            self.logger.warning(message)
+        return success
+
+    def _test_provider_accelerators(self) -> bool:
+        """Delegate accelerator validation to provider."""
+        success, message = self.provider.validate_accelerators()
+        if success:
+            self.logger.info(message)
+        else:
+            self.logger.warning(message)
+        return success
+
+    def _test_zone_compatibility(self) -> bool:
+        """GCP-specific zone validation."""
+        if isinstance(self.provider, GCPProvider):
+            success, message = self.provider.validate_zone_compatibility()
+            if success:
+                self.logger.info(message)
+            else:
+                self.logger.warning(message)
+            return success
+        return True  # Not applicable for other clouds
 
     def _get_all_crd_names(self, cache=True):
         if cache and self.crds_cache is not None:
@@ -270,94 +346,6 @@ class LLMDXKSChecks:
             test_failed = True
         return not test_failed
 
-    def test_gpu_availability(self):
-        def nvidia_driver_present(node):
-            allocatable = node.status.allocatable or {}
-            if "nvidia.com/gpu" in allocatable:
-                if int(node.status.allocatable["nvidia.com/gpu"]) > 0:
-                    return True
-                else:
-                    self.logger.warning(
-                            f"No allocatable NVIDIA GPUs on node {node.metadata.name}"
-                            " - no NVIDIA GPU drivers present")
-                    return False
-            else:
-                self.logger.warning(
-                        f"No NVIDIA GPU drivers present on node {node.metadata.name}"
-                        " - no NVIDIA GPU accelerators present")
-                return False
-        gpu_found = False
-        accelerators = {
-            "nvidia": 0,
-            "other": 0,
-        }
-        nodes = self.k8s_client.CoreV1Api().list_node() or {}
-        for node in nodes.items:
-            labels = node.metadata.labels or {}
-            if "nvidia.com/gpu.present" in labels:
-                accelerators["nvidia"] += 1
-                self.logger.info(f"NVIDIA GPU accelerator present on node {node.metadata.name}")
-                if nvidia_driver_present(node):
-                    gpu_found = True
-            else:
-                accelerators["other"] += 1
-        if not gpu_found:
-            self.logger.warning("No supported GPU drivers found")
-            return False
-        else:
-            self.logger.info("At least one supported GPU driver found")
-            return True
-
-    def test_instance_type(self):
-        def azure_instance_type():
-            instance_types = {
-                "Standard_NC24ads_A100_v4": 0,
-                "Standard_ND96asr_v4": 0,
-                "Standard_ND96amsr_A100_v4": 0,
-                "Standard_ND96isr_H100_v5": 0,
-                "Standard_ND96isr_H200_v5": 0,
-            }
-            nodes = self.k8s_client.CoreV1Api().list_node() or {}
-            for node in nodes.items:
-                labels = node.metadata.labels
-                instance_type = ""
-                if "beta.kubernetes.io/instance-type" in labels:
-                    instance_type = labels["beta.kubernetes.io/instance-type"]
-                if "node.kubernetes.io/instance-type" in labels:
-                    instance_type = labels["node.kubernetes.io/instance-type"]
-                if instance_type != "":
-                    try:
-                        instance_types[instance_type] += 1
-                    except KeyError:
-                        # ignore unknown instance types
-                        pass
-            max_instance_type = max(instance_types, key=instance_types.get)
-            if instance_types[max_instance_type] == 0:
-                self.logger.warning("No supported instance type found")
-                return False
-            else:
-                self.logger.info("At least one supported Azure instance type found")
-                self.logger.debug(f"Instances by type: {instance_types}")
-                return True
-
-        if self.cloud_provider == "azure":
-            return azure_instance_type()
-        else:
-            self.logger.warning("Unsupported cloud provider")
-            return False
-
-    def detect_cloud_provider(self):
-        clouds = {
-            "none": 0,
-            "azure": 0,
-        }
-        nodes = self.k8s_client.CoreV1Api().list_node() or {}
-        for node in nodes.items:
-            labels = node.metadata.labels
-            if "kubernetes.azure.com/cluster" in labels:
-                clouds["azure"] += 1
-
-        return max(clouds, key=clouds.get)
 
     def run(self, suite=None):
         suites = []
@@ -451,7 +439,7 @@ def cli_arguments():
 
     parser.add_argument(
         "-u", "--cloud-provider",
-        choices=["auto", "azure"],
+        choices=["auto", "azure", "gcp"],
         default="auto",
         env_var="LLMD_XKS_CLOUD_PROVIDER",
         help="Cloud provider to perform checks on (by default, try to auto-detect)"
