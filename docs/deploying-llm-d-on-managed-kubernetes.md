@@ -165,18 +165,16 @@ Red Hat AI Inference Server on managed Kubernetes consists of the following comp
 
 ### Component Interaction
 
-```text
-                                    ┌─────────────────────────────────────┐
-                                    │         Kubernetes Cluster          │
-┌──────────┐    ┌──────────────┐    │  ┌─────────┐    ┌────────────────┐  │
-│  Client  │───▶│   Gateway    │───▶│  │   EPP   │───▶│  vLLM Pods     │  │
-│          │    │   (Istio)    │    │  │Scheduler│    │  (Model)       │  │
-└──────────┘    └──────────────┘    │  └─────────┘    └────────────────┘  │
-                                    │        ▲               ▲            │
-                                    │        │    mTLS      │            │
-                                    │        └───────────────┘            │
-                                    │              cert-manager           │
-                                    └─────────────────────────────────────┘
+```mermaid
+graph LR
+    Client --> Gateway["Gateway<br/>(Istio)"]
+
+    subgraph Kubernetes Cluster
+        Gateway --> EPP["EPP<br/>Scheduler"]
+        EPP --> vLLM["vLLM Pods<br/>(Model)"]
+        cert-manager -. mTLS .-> EPP
+        cert-manager -. mTLS .-> vLLM
+    end
 ```
 
 ---
