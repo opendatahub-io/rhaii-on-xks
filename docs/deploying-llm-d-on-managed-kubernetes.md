@@ -592,7 +592,6 @@ For assistance with Red Hat AI Inference Server deployments, contact Red Hat Sup
 **Additional Resources:**
 
 * [KServe Chart README](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/charts/kserve/README.md) - KServe Helm chart details, PKI prerequisites, and OCI registry install
-* [Preflight Validation](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/validation/README.md)
-* Cluster readiness and post-deployment validation checks
+* [Preflight Validation](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/validation/README.md) - Cluster readiness and post-deployment validation checks
 * [Monitoring Setup Guide](../monitoring-stack/) - Optional Prometheus/Grafana configuration for dashboards and autoscaling
 * [KServe LLMInferenceService Samples](https://github.com/red-hat-data-services/kserve/tree/rhoai-3.4/docs/samples/llmisvc)
