@@ -1,3 +1,9 @@
 # Default values for kserve-rhaii-xks
 # This chart uses pre-rendered Kustomize output with embedded Go templates
 # that are passed through unchanged to the cluster.
+
+# Pull secret for registry.redhat.io
+# Auth is configured in the root values.yaml and passed via helmfile
+pullSecret:
+  name: redhat-pull-secret
+  dockerConfigJson: ""  # Set automatically by helmfile from root auth config

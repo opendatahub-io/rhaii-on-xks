@@ -1,1 +1,39 @@
-{{ .Files.Get "files/resources.yaml" }}
+{{- $resourcesFile := .Files.Get "files/resources.yaml" }}
+{{- $pullSecretEmitted := dict }}
+{{- range $doc := regexSplit "(?m)^---$" $resourcesFile -1 }}
+{{- $resource := fromYaml $doc }}
+{{- if and $resource $resource.kind }}
+{{- if eq $resource.kind "ServiceAccount" }}
+{{- $ns := $resource.metadata.namespace }}
+{{- if and $.Values.pullSecret.dockerConfigJson (not (hasKey $pullSecretEmitted $ns)) }}
+{{- $_ := set $pullSecretEmitted $ns true }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $.Values.pullSecret.name }}
+  namespace: {{ $ns }}
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: {{ $.Values.pullSecret.dockerConfigJson | b64enc }}
+{{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  {{- with $resource.metadata.labels }}
+  labels:
+    {{- range $key, $value := . }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+  {{- end }}
+  name: {{ $resource.metadata.name }}
+  namespace: {{ $ns }}
+imagePullSecrets:
+  - name: {{ $.Values.pullSecret.name }}
+{{- else }}
+---
+{{ $doc }}
+{{- end }}
+{{- end }}
+{{- end }}

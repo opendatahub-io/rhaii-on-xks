@@ -51,6 +51,14 @@ releases:
     version: {{ $kserveVersion }}
     namespace: opendatahub
     disableValidation: true
+    set:
+{{- if .Values.useSystemPodmanAuth }}
+      - name: pullSecret.dockerConfigJson
+        file: {{ env "HOME" }}/.config/containers/auth.json
+{{- else if .Values.pullSecretFile }}
+      - name: pullSecret.dockerConfigJson
+        file: {{ .Values.pullSecretFile }}
+{{- end }}
     # CRDs are applied separately via presync hook to avoid 1MB secret size limit
     hooks:
       # Apply CRDs before helm install via presync
