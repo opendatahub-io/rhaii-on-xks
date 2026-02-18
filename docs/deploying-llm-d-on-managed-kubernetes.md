@@ -514,10 +514,6 @@ make deploy-kserve
 **Resolution:**
 
 ```bash
-kubectl get secret redhat-pull-secret -n istio-system -o json | \
-  jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations, .metadata.labels) | .metadata.namespace = "opendatahub"' | \
-  kubectl create -f -
-
 kubectl patch sa inference-gateway-istio -n opendatahub \
   -p '{"imagePullSecrets": [{"name": "redhat-pull-secret"}]}'
 

@@ -5,5 +5,4 @@
 # Pull secret for registry.redhat.io
 # Auth is configured in the root values.yaml and passed via helmfile
 pullSecret:
-  name: redhat-pull-secret
   dockerConfigJson: ""  # Set automatically by helmfile from root auth config

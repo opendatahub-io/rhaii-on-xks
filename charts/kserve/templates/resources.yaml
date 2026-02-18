@@ -11,7 +11,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ $.Values.pullSecret.name }}
+  name: redhat-pull-secret
   namespace: {{ $ns }}
 type: kubernetes.io/dockerconfigjson
 data:
@@ -40,7 +40,7 @@ automountServiceAccountToken: {{ $resource.automountServiceAccountToken }}
 {{- end }}
 {{- if $.Values.pullSecret.dockerConfigJson }}
 imagePullSecrets:
-  - name: {{ $.Values.pullSecret.name }}
+  - name: redhat-pull-secret
   {{- range $resource.imagePullSecrets }}
   - name: {{ .name }}
   {{- end }}
