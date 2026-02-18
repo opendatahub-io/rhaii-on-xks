@@ -27,10 +27,29 @@ metadata:
     {{ $key }}: {{ $value | quote }}
     {{- end }}
   {{- end }}
+  {{- with $resource.metadata.annotations }}
+  annotations:
+    {{- range $key, $value := . }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+  {{- end }}
   name: {{ $resource.metadata.name }}
   namespace: {{ $ns }}
+{{- if hasKey $resource "automountServiceAccountToken" }}
+automountServiceAccountToken: {{ $resource.automountServiceAccountToken }}
+{{- end }}
+{{- if $.Values.pullSecret.dockerConfigJson }}
 imagePullSecrets:
   - name: {{ $.Values.pullSecret.name }}
+  {{- range $resource.imagePullSecrets }}
+  - name: {{ .name }}
+  {{- end }}
+{{- else if $resource.imagePullSecrets }}
+imagePullSecrets:
+  {{- range $resource.imagePullSecrets }}
+  - name: {{ .name }}
+  {{- end }}
+{{- end }}
 {{- else }}
 ---
 {{ $doc }}

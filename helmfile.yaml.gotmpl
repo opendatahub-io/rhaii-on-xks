@@ -52,7 +52,7 @@ releases:
     namespace: opendatahub
     disableValidation: true
     set:
-{{- if .Values.useSystemPodmanAuth }}
+{{- if (.Values.useSystemPodmanAuth | default true) }}
       - name: pullSecret.dockerConfigJson
         file: {{ env "HOME" }}/.config/containers/auth.json
 {{- else if .Values.pullSecretFile }}
