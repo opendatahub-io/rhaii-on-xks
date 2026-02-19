@@ -271,6 +271,20 @@ Verify the Gateway pod is running:
 kubectl get pods -n opendatahub -l gateway.networking.k8s.io/gateway-name=inference-gateway
 ```
 
+### 4.3 AKS: Fix Load Balancer Health Probe
+
+On AKS, external traffic to the inference gateway on port 80 may time out due to the Azure Load Balancer using an HTTP health probe that fails against the Istio gateway. This is handled automatically by `setup-gateway.sh` on AKS.
+
+If you need to apply it manually (e.g., after recreating the Gateway):
+
+```bash
+kubectl annotate svc inference-gateway-istio -n opendatahub \
+  "service.beta.kubernetes.io/port_80_health-probe_protocol=tcp" \
+  --overwrite
+```
+
+> **Note:** The port number in the annotation must match the Gateway listener port (`80` here, as configured in `setup-gateway.sh`). If the Gateway is deleted and recreated without re-running `setup-gateway.sh`, the annotation will be lost and must be reapplied. See [Azure LB Health Probe Workaround](./azure-lb-health-probe-workaround.md) for full details.
+
 ---
 
 ## 5. Deploying an LLM Inference Service
