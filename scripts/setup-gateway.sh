@@ -176,25 +176,6 @@ EOF
   fi
 }
 
-copy_pull_secret() {
-  log_info "Copying pull secret to ${KSERVE_NAMESPACE}..."
-
-  # Check if pull secret exists in istio-system
-  if ! kubectl get secret "${REDHAT_PULL_SECRET}" -n istio-system &>/dev/null; then
-    log_error "Pull secret ${REDHAT_PULL_SECRET} not found in istio-system namespace"
-    log_error "Run 'make deploy' first to deploy infrastructure with pull secret"
-    return 1
-  fi
-
-  # Delete existing secret to avoid conflicts, then create fresh copy
-  kubectl delete secret "${REDHAT_PULL_SECRET}" -n "${KSERVE_NAMESPACE}" --ignore-not-found
-  kubectl get secret "${REDHAT_PULL_SECRET}" -n istio-system -o yaml | \
-    sed "s/namespace: istio-system/namespace: ${KSERVE_NAMESPACE}/" | \
-    kubectl create -f -
-
-  log_success "Pull secret copied to ${KSERVE_NAMESPACE}"
-}
-
 pull_secret_setup() {
   log_info "Patching ServiceAccount ${ISTIO_SERVICEACCOUNT} with pull secret..."
 
@@ -282,7 +263,6 @@ main() {
     kubectl create namespace "${KSERVE_NAMESPACE}"
   fi
 
-  copy_pull_secret
   setup_ca_bundle
   create_gateway_config
   create_gateway
