@@ -118,6 +118,10 @@ data:
             - name: odh-ca-bundle
               mountPath: ${CA_MOUNT_PATH}
               readOnly: true
+  service: |
+    metadata:
+      annotations:
+        service.beta.kubernetes.io/port_80_health-probe_protocol: tcp
 EOF
 
   log_success "Gateway config ConfigMap created: ${GATEWAY_NAME}-config"
