@@ -165,18 +165,16 @@ Red Hat AI Inference Server on managed Kubernetes consists of the following comp
 
 ### Component Interaction
 
-```text
-                                    ┌─────────────────────────────────────┐
-                                    │         Kubernetes Cluster          │
-┌──────────┐    ┌──────────────┐    │  ┌─────────┐    ┌────────────────┐  │
-│  Client  │───▶│   Gateway    │───▶│  │   EPP   │───▶│  vLLM Pods     │  │
-│          │    │   (Istio)    │    │  │Scheduler│    │  (Model)       │  │
-└──────────┘    └──────────────┘    │  └─────────┘    └────────────────┘  │
-                                    │        ▲               ▲            │
-                                    │        │    mTLS      │            │
-                                    │        └───────────────┘            │
-                                    │              cert-manager           │
-                                    └─────────────────────────────────────┘
+```mermaid
+graph LR
+    Client --> Gateway["Gateway<br/>(Istio)"]
+
+    subgraph Kubernetes Cluster
+        Gateway --> EPP["EPP<br/>Scheduler"]
+        EPP --> vLLM["vLLM Pods<br/>(Model)"]
+        cert-manager -. mTLS .-> EPP
+        cert-manager -. mTLS .-> vLLM
+    end
 ```
 
 ---
@@ -606,7 +604,8 @@ make deploy-kserve
 For assistance with Red Hat AI Inference Server deployments, contact Red Hat Support or consult the product documentation.
 
 **Additional Resources:**
-- [KServe Chart README](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/charts/kserve/README.md) - KServe Helm chart details, PKI prerequisites, and OCI registry install
-- [Preflight Validation](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/validation/README.md) - Cluster readiness and post-deployment validation checks
-- [Monitoring Setup Guide](../monitoring-stack/) - Optional Prometheus/Grafana configuration for dashboards and autoscaling
-- [KServe LLMInferenceService Samples](https://github.com/red-hat-data-services/kserve/tree/rhoai-3.4/docs/samples/llmisvc)
+
+* [KServe Chart README](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/charts/kserve/README.md) - KServe Helm chart details, PKI prerequisites, and OCI registry install
+* [Preflight Validation](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/validation/README.md) - Cluster readiness and post-deployment validation checks
+* [Monitoring Setup Guide](../monitoring-stack/) - Optional Prometheus/Grafana configuration for dashboards and autoscaling
+* [KServe LLMInferenceService Samples](https://github.com/red-hat-data-services/kserve/tree/rhoai-3.4/docs/samples/llmisvc)

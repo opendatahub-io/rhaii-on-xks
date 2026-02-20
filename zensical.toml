@@ -1,0 +1,44 @@
+[project]
+site_name = "Red Hat AI Inference on managed Kubernetes"
+site_url = "https://opendatahub-io.github.io/rhaii-on-xks"
+repo_url = "https://github.com/opendatahub-io/rhaii-on-xks"
+edit_uri = "edit/main/docs/"
+nav = [
+    {"Home" = [
+    {"Get started" = "index.md"},
+    {"Architecture" = "architecture-xks-deployment.md"},
+    ]},
+    {"Deploy" = [
+        {"Deploy" = "deploying-llm-d-on-managed-kubernetes.md"},
+        {"Set up the gateway" = "gateway-setup-for-kserve.md"},
+        {"Debug" = "collecting-debug-information.md"},
+    ]},
+]
+
+[project.theme]
+logo = "images/odh.png"
+features = [
+    "navigation.tabs",
+    "navigation.tabs.sticky",
+    "navigation.sections",
+    "navigation.expand",
+    "content.action.edit",
+    "content.action.view",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" }
+]

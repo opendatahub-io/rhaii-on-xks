@@ -52,4 +52,4 @@ kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
 ## Dashboards
 
 Community dashboards available at:
-- [llm-d Dashboards](https://github.com/llm-d/llm-d/tree/main/docs/monitoring/dashboards)
+- [llm-d Dashboards](https://github.com/llm-d/llm-d/tree/main/docs/monitoring/grafana/dashboards)
