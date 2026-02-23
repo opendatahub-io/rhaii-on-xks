@@ -15,7 +15,7 @@ A CLI application for running validation checks against Kubernetes clusters in t
 | Cloud provider | Managed K8s Service |
 | -------------- | ------------------- |
 | [Azure](https://azure.microsoft.com) | [AKS](https://azure.microsoft.com/en-us/products/kubernetes-service) |
-<!-- | [CoreWeave](https://coreweave.com)   | [CKS](https://coreweave.com/products/coreweave-kubernetes-service) | (coming soon) -->
+| [CoreWeave](https://coreweave.com)   | [CKS](https://coreweave.com/products/coreweave-kubernetes-service)   |
 
 
 ## Container image build
@@ -90,6 +90,11 @@ At the end, a brief report is printed with `PASSED` or `FAILED` status for each 
 - `Standard_ND96isr_H100_v5` (NVIDIA H100)
 - `Standard_ND96isr_H200_v5` (NVIDIA H200)
 
+ **CoreWeave Supported Instance Types**:
+- `b200-8x` (B200 (InfiniBand))
+- `gd-8xh200ib-i128` (H200 (InfiniBand))
+- `gd-8xh100ib-i128` (H100 (InfiniBand))
+- `gd-8xa100-i128` (A100)
 
 ## Standalone script usage
 
@@ -101,7 +106,7 @@ Required dependencies:
 
 - `-l, --log-level`: Set the log level (choices: DEBUG, INFO, WARNING, ERROR, CRITICAL, default: INFO)
 - `-k, --kube-config`: Path to the kubeconfig file (overrides KUBECONFIG environment variable)
-- `-u, --cloud-provider`: Cloud provider to perform checks on (choices: auto, azure, default: auto)
+- `-u, --cloud-provider`: Cloud provider to perform checks on (choices: auto, azure, coreweave, default: auto)
 - `-c, --config`: Path to a custom config file
 - `-s, --suite`: Test suite to run (choices: all, cluster, operators, default: all)
 - `-h, --help`: Show help message
@@ -128,6 +133,6 @@ cloud_provider = azure
 ### Environment Variables
 
 - `LLMD_XKS_LOG_LEVEL`: Log level (same choices as `--log-level`)
-- `LLMD_XKS_CLOUD_PROVIDER`: Cloud provider (choices: auto, azure)
+- `LLMD_XKS_CLOUD_PROVIDER`: Cloud provider (choices: auto, azure, coreweave)
 - `LLMD_XKS_SUITE`: Test suite to run (choices: all(default), cluster, operators)
 - `KUBECONFIG`: Path to kubeconfig file (standard Kubernetes environment variable)

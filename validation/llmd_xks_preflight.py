@@ -294,7 +294,9 @@ class LLMDXKSChecks:
         nodes = self.k8s_client.CoreV1Api().list_node() or {}
         for node in nodes.items:
             labels = node.metadata.labels or {}
-            if "nvidia.com/gpu.present" in labels:
+            # Check if NVIDIA gpu-operator node label is applied --OR-- cloud provider gpu node label is applied
+            if ("nvidia.com/gpu.present" in labels or      # NVIDIA gpu-operator
+                    labels.get("gpu.nvidia.com/class")):   # CoreWeave
                 accelerators["nvidia"] += 1
                 self.logger.info(f"NVIDIA GPU accelerator present on node {node.metadata.name}")
                 if nvidia_driver_present(node):
@@ -340,8 +342,40 @@ class LLMDXKSChecks:
                 self.logger.debug(f"Instances by type: {instance_types}")
                 return True
 
+        def coreweave_instance_type():
+            instance_types = {
+                "b200-8x": 0,
+                "gd-8xh200ib-i128": 0,
+                "gd-8xh100ib-i128": 0,
+                "gd-8xa100-i128": 0,
+            }
+            nodes = self.k8s_client.CoreV1Api().list_node() or {}
+            for node in nodes.items:
+                labels = node.metadata.labels
+                instance_type = ""
+                if "beta.kubernetes.io/instance-type" in labels:
+                    instance_type = labels["beta.kubernetes.io/instance-type"]
+                if "node.kubernetes.io/instance-type" in labels:
+                    instance_type = labels["node.kubernetes.io/instance-type"]
+                if instance_type != "":
+                    try:
+                        instance_types[instance_type] += 1
+                    except KeyError:
+                        # ignore unknown instance types
+                        pass
+            max_instance_type = max(instance_types, key=instance_types.get)
+            if instance_types[max_instance_type] == 0:
+                self.logger.warning("No supported instance type found")
+                return False
+            else:
+                self.logger.info("At least one supported CoreWeave instance type found")
+                self.logger.debug(f"Instances by type: {instance_types}")
+                return True
+
         if self.cloud_provider == "azure":
             return azure_instance_type()
+        elif self.cloud_provider == "coreweave":
+            return coreweave_instance_type()
         else:
             self.logger.warning("Unsupported cloud provider")
             return False
@@ -350,12 +384,15 @@ class LLMDXKSChecks:
         clouds = {
             "none": 0,
             "azure": 0,
+            "coreweave": 0,
         }
         nodes = self.k8s_client.CoreV1Api().list_node() or {}
         for node in nodes.items:
             labels = node.metadata.labels
             if "kubernetes.azure.com/cluster" in labels:
                 clouds["azure"] += 1
+            elif "cks.coreweave.com/cluster" in labels:
+                clouds["coreweave"] += 1
 
         return max(clouds, key=clouds.get)
 
@@ -451,7 +488,7 @@ def cli_arguments():
 
     parser.add_argument(
         "-u", "--cloud-provider",
-        choices=["auto", "azure"],
+        choices=["auto", "azure", "coreweave"],
         default="auto",
         env_var="LLMD_XKS_CLOUD_PROVIDER",
         help="Cloud provider to perform checks on (by default, try to auto-detect)"
