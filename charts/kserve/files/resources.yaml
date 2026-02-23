@@ -648,7 +648,7 @@ data:
     }
   oauthProxy: |-
     {
-      "image" : "registry.redhat.io/rhoai/odh-kube-auth-proxy-rhel9@sha256:169d9fe4dc6032344b295221ccbfa20f28e54f6ef490452b21459488bf472f8d",
+      "image" : "registry.redhat.io/rhoai/odh-kube-auth-proxy-rhel9@sha256:2c4be58b9cbbfbf0cce82771f9823f5df664a21c139feee9e4f8beb9cf3ad76a",
       "memoryRequest": "64Mi",
       "memoryLimit": "128Mi",
       "cpuRequest": "100m",
@@ -711,7 +711,7 @@ data:
   kserve-llm-d-routing-sidecar: registry.redhat.io/rhoai/odh-llm-d-routing-sidecar-rhel9@sha256:7f93742da18df2ce220cd8d6a0310c18af6fe04905c83f23d022e065716ebd88
   kserve-router: registry.redhat.io/rhoai/odh-kserve-router-rhel9@sha256:26dc51b1f099964196c35bbc0801a5523da75c16095733c9870b7c46b1677871
   kserve-storage-initializer: registry.redhat.io/rhoai/odh-kserve-storage-initializer-rhel9@sha256:37d31edc075adf26a529197281797a24b76bd4924d7903c2754992174959ee91
-  kube-rbac-proxy: registry.redhat.io/rhoai/odh-kube-auth-proxy-rhel9@sha256:169d9fe4dc6032344b295221ccbfa20f28e54f6ef490452b21459488bf472f8d
+  kube-rbac-proxy: registry.redhat.io/rhoai/odh-kube-auth-proxy-rhel9@sha256:2c4be58b9cbbfbf0cce82771f9823f5df664a21c139feee9e4f8beb9cf3ad76a
 kind: ConfigMap
 metadata:
   name: kserve-parameters
