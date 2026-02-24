@@ -31,7 +31,7 @@ Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLM
 ## Prerequisites
 
 - Kubernetes cluster (AKS or CoreWeave) - see [llm-d-xks-aks](https://github.com/kwozyman/llm-d-xks-aks) for AKS provisioning
-- `kubectl`, `helm` (v3.17+), `helmfile`
+- `kubectl`, `helm` (v3.17+), `helmfile`, `helm-diff` plugin
 - Red Hat account (for Sail Operator and vLLM images from `registry.redhat.io`)
 
 **Cluster readiness check (optional):** Run `cd validation && make container && make run` to verify cloud provider, GPU availability, and instance types before deploying. CRD checks will pass only after operators are deployed. See [Preflight Validation](./validation/README.md).
