@@ -46,6 +46,7 @@ deploy-all: check-kubeconfig deploy-cert-manager deploy-istio deploy-lws deploy-
 	@$(MAKE) status
 
 deploy-cert-manager: check-kubeconfig clear-cache
+	helmfile template --selector name=cert-manager-operator --debug 2>&1 | less
 	helmfile apply --selector name=cert-manager-operator
 
 deploy-istio: check-kubeconfig clear-cache

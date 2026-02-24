@@ -22,21 +22,21 @@ helmfiles:
   - path: charts/cert-manager-operator/helmfile.yaml.gotmpl
     selectorsInherited: true
     values:
-      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
+      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
   # sail-operator (Istio) - OSSM 3.2.x / Istio 1.27+ with v1 InferencePool API
   - path: charts/sail-operator/helmfile.yaml.gotmpl
     selectorsInherited: true
     values:
-      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
+      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
   # lws-operator
   - path: charts/lws-operator/helmfile.yaml.gotmpl
     selectorsInherited: true
     values:
-      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
+      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
 ---
