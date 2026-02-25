@@ -80,6 +80,17 @@ timeout 10 kubectl delete infrastructure cluster --ignore-not-found 2>/dev/null 
 log "Deleting cert-manager webhook secret..."
 kubectl delete secret cert-manager-webhook-ca -n cert-manager --ignore-not-found 2>/dev/null || true
 
+# Clean up Istio cluster-scoped resources left behind by the operator's internal Helm release (default-istiod)
+# These are not managed by helmfile and survive helmfile destroy + namespace deletion
+log "Cleaning up Istio cluster-scoped resources..."
+kubectl get clusterrole,clusterrolebinding,mutatingwebhookconfiguration,validatingwebhookconfiguration -o name 2>/dev/null \
+    | grep -i istio | xargs -r kubectl delete --ignore-not-found 2>/dev/null || true
+
+# Clean up cert-manager cluster-scoped resources
+log "Cleaning up cert-manager cluster-scoped resources..."
+kubectl get clusterrole,clusterrolebinding,mutatingwebhookconfiguration,validatingwebhookconfiguration -o name 2>/dev/null \
+    | grep -i cert-manager | xargs -r kubectl delete --ignore-not-found 2>/dev/null || true
+
 # Delete CRDs installed by this repo (Helm does not remove CRDs on uninstall)
 log "Cleaning up CRDs..."
 CRDS=$(kubectl get crd -o name 2>/dev/null || true)

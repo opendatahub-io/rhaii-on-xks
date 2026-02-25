@@ -153,6 +153,21 @@ status: check-kubeconfig
 	@echo -n "Istio version: "
 	@kubectl get istio default -n istio-system -o jsonpath='{.spec.version}' 2>/dev/null || echo "Not deployed"
 	@echo ""
+	@echo -n "Istio status: "
+	@kubectl get istio default -n istio-system -o jsonpath='{.status.state}' 2>/dev/null || echo "Not deployed"
+	@echo ""
+	@echo -n "GatewayClass 'istio': "
+	@if kubectl get gatewayclass istio >/dev/null 2>&1; then \
+		echo "Available"; \
+	else \
+		ISTIO_STATUS=$$(kubectl get istio default -n istio-system -o jsonpath='{.status.state}' 2>/dev/null); \
+		if [ "$$ISTIO_STATUS" = "ReconcileError" ]; then \
+			echo "NOT AVAILABLE (Istio has ReconcileError — check: kubectl get istio -A)"; \
+		else \
+			echo "NOT AVAILABLE (Istio may still be reconciling — check: kubectl get istio -A)"; \
+		fi; \
+	fi
+	@echo ""
 
 # Test/Conformance (ODH deployment validation)
 NAMESPACE ?= llm-d

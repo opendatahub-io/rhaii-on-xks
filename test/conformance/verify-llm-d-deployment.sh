@@ -1734,6 +1734,36 @@ check_istio() {
     else
         log_warn "istiod not found"
     fi
+
+    # Check Istio CR reconciliation status
+    local istio_status
+    istio_status=$($KUBECTL get istio default -n "$istio_ns" -o jsonpath='{.status.state}' 2>/dev/null || echo "")
+    if [[ -n "$istio_status" ]]; then
+        if [[ "$istio_status" == "Healthy" ]]; then
+            log_pass "Istio CR status: Healthy"
+        elif [[ "$istio_status" == "ReconcileError" ]]; then
+            local istio_msg
+            istio_msg=$($KUBECTL get istio default -n "$istio_ns" -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
+            log_fail "Istio CR status: ReconcileError"
+            log_info "  Message: $istio_msg"
+            log_info "  Hint: Check for leftover cluster-scoped resources from a previous install"
+            log_info "  Fix: kubectl get clusterrole,clusterrolebinding,mutatingwebhookconfiguration,validatingwebhookconfiguration -o name | grep -i istio | xargs -r kubectl delete --ignore-not-found"
+        else
+            log_warn "Istio CR status: $istio_status"
+        fi
+    fi
+
+    # Check GatewayClass
+    if $KUBECTL get gatewayclass istio &>/dev/null; then
+        log_pass "GatewayClass 'istio' available"
+    else
+        log_fail "GatewayClass 'istio' not available"
+        if [[ "$istio_status" == "ReconcileError" ]]; then
+            log_info "  GatewayClass missing due to Istio ReconcileError (fix Istio first)"
+        else
+            log_info "  Istio may still be reconciling — wait and retry"
+        fi
+    fi
 }
 
 # Check LWS (LeaderWorkerSet) operator
