@@ -151,16 +151,17 @@ status: check-kubeconfig
 		echo "Not installed"; \
 	fi
 	@echo -n "Istio version: "
-	@kubectl get istio default -n istio-system -o jsonpath='{.spec.version}' 2>/dev/null || echo "Not deployed"
-	@echo ""
+	@ISTIO_VER=$$(kubectl get istio -o jsonpath='{.items[0].spec.version}' 2>/dev/null); \
+		if [ -n "$$ISTIO_VER" ]; then echo "$$ISTIO_VER"; else echo "Not deployed"; fi
 	@echo -n "Istio status: "
-	@kubectl get istio default -n istio-system -o jsonpath='{.status.state}' 2>/dev/null || echo "Not deployed"
+	@ISTIO_STATE=$$(kubectl get istio -o jsonpath='{.items[0].status.state}' 2>/dev/null); \
+		if [ -n "$$ISTIO_STATE" ]; then echo "$$ISTIO_STATE"; else echo "Not deployed"; fi
 	@echo ""
 	@echo -n "GatewayClass 'istio': "
 	@if kubectl get gatewayclass istio >/dev/null 2>&1; then \
 		echo "Available"; \
 	else \
-		ISTIO_STATUS=$$(kubectl get istio default -n istio-system -o jsonpath='{.status.state}' 2>/dev/null); \
+		ISTIO_STATUS=$$(kubectl get istio -o jsonpath='{.items[0].status.state}' 2>/dev/null); \
 		if [ "$$ISTIO_STATUS" = "ReconcileError" ]; then \
 			echo "NOT AVAILABLE (Istio has ReconcileError — check: kubectl get istio -A)"; \
 		else \

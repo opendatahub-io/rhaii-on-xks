@@ -1735,21 +1735,32 @@ check_istio() {
         log_warn "istiod not found"
     fi
 
-    # Check Istio CR reconciliation status
-    local istio_status
-    istio_status=$($KUBECTL get istio default -n "$istio_ns" -o jsonpath='{.status.state}' 2>/dev/null || echo "")
-    if [[ -n "$istio_status" ]]; then
-        if [[ "$istio_status" == "Healthy" ]]; then
-            log_pass "Istio CR status: Healthy"
-        elif [[ "$istio_status" == "ReconcileError" ]]; then
-            local istio_msg
-            istio_msg=$($KUBECTL get istio default -n "$istio_ns" -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
-            log_fail "Istio CR status: ReconcileError"
-            log_info "  Message: $istio_msg"
-            log_info "  Hint: Check for leftover cluster-scoped resources from a previous install"
-            log_info "  Fix: kubectl get clusterrole,clusterrolebinding,mutatingwebhookconfiguration,validatingwebhookconfiguration -o name | grep -i istio | xargs -r kubectl delete --ignore-not-found"
+    # Discover Istio CR name dynamically
+    local istio_cr_name istio_status=""
+    istio_cr_name=$($KUBECTL get istio -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+    if [[ -z "$istio_cr_name" ]]; then
+        log_warn "No Istio CR found in $istio_ns"
+        log_info "  Hint: The Sail Operator needs an Istio CR to deploy the control plane"
+    else
+        # Check Istio CR reconciliation status
+        istio_status=$($KUBECTL get istio "$istio_cr_name" -o jsonpath='{.status.state}' 2>/dev/null || echo "")
+        if [[ -n "$istio_status" ]]; then
+            if [[ "$istio_status" == "Healthy" ]]; then
+                log_pass "Istio CR '$istio_cr_name' status: Healthy"
+            elif [[ "$istio_status" == "ReconcileError" ]]; then
+                local istio_msg
+                istio_msg=$($KUBECTL get istio "$istio_cr_name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
+                log_fail "Istio CR '$istio_cr_name' status: ReconcileError"
+                log_info "  Message: $istio_msg"
+                log_info "  Hint: Check for leftover cluster-scoped resources from a previous install"
+                log_info "  Fix: kubectl get clusterrole,clusterrolebinding,mutatingwebhookconfiguration,validatingwebhookconfiguration -o name | grep -i istio | xargs -r kubectl delete --ignore-not-found"
+            else
+                log_warn "Istio CR '$istio_cr_name' status: $istio_status"
+            fi
         else
-            log_warn "Istio CR status: $istio_status"
+            log_warn "Istio CR '$istio_cr_name' status: not yet reported"
+            log_info "  Hint: The Sail Operator may still be reconciling — wait and check: kubectl get istio"
         fi
     fi
 
@@ -1758,7 +1769,9 @@ check_istio() {
         log_pass "GatewayClass 'istio' available"
     else
         log_fail "GatewayClass 'istio' not available"
-        if [[ "$istio_status" == "ReconcileError" ]]; then
+        if [[ -z "$istio_cr_name" ]]; then
+            log_info "  No Istio CR found — GatewayClass requires Istio to be deployed"
+        elif [[ "$istio_status" == "ReconcileError" ]]; then
             log_info "  GatewayClass missing due to Istio ReconcileError (fix Istio first)"
         else
             log_info "  Istio may still be reconciling — wait and retry"
