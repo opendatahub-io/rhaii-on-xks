@@ -165,18 +165,16 @@ Red Hat AI Inference Server on managed Kubernetes consists of the following comp
 
 ### Component Interaction
 
-```text
-                                    ┌─────────────────────────────────────┐
-                                    │         Kubernetes Cluster          │
-┌──────────┐    ┌──────────────┐    │  ┌─────────┐    ┌────────────────┐  │
-│  Client  │───▶│   Gateway    │───▶│  │   EPP   │───▶│  vLLM Pods     │  │
-│          │    │   (Istio)    │    │  │Scheduler│    │  (Model)       │  │
-└──────────┘    └──────────────┘    │  └─────────┘    └────────────────┘  │
-                                    │        ▲               ▲            │
-                                    │        │    mTLS      │            │
-                                    │        └───────────────┘            │
-                                    │              cert-manager           │
-                                    └─────────────────────────────────────┘
+```mermaid
+graph LR
+    Client --> Gateway["Gateway<br/>(Istio)"]
+
+    subgraph Kubernetes Cluster
+        Gateway --> EPP["EPP<br/>Scheduler"]
+        EPP --> vLLM["vLLM Pods<br/>(Model)"]
+        cm["cert-manager"] -. mTLS .-> EPP
+        cm["cert-manager"] -. mTLS .-> vLLM
+    end
 ```
 
 ---
@@ -270,6 +268,20 @@ Verify the Gateway pod is running:
 ```bash
 kubectl get pods -n opendatahub -l gateway.networking.k8s.io/gateway-name=inference-gateway
 ```
+
+### 4.3 AKS: Fix Load Balancer Health Probe
+
+On AKS, external traffic to the inference gateway on port 80 may time out due to the Azure Load Balancer using an HTTP health probe that fails against the Istio gateway. This is handled automatically by `setup-gateway.sh` on AKS.
+
+If you need to apply it manually (e.g., after recreating the Gateway):
+
+```bash
+kubectl annotate svc inference-gateway-istio -n opendatahub \
+  "service.beta.kubernetes.io/port_80_health-probe_protocol=tcp" \
+  --overwrite
+```
+
+> **Note:** The port number in the annotation must match the Gateway listener port (`80` here, as configured in `setup-gateway.sh`). If the Gateway is deleted and recreated without re-running `setup-gateway.sh`, the annotation will be lost and must be reapplied. See [Azure LB Health Probe Workaround](./azure-lb-health-probe-workaround.md) for full details.
 
 ---
 
@@ -588,7 +600,8 @@ make deploy-kserve
 For assistance with Red Hat AI Inference Server deployments, contact Red Hat Support or consult the product documentation.
 
 **Additional Resources:**
-- [KServe Chart README](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/charts/kserve/README.md) - KServe Helm chart details, PKI prerequisites, and OCI registry install
-- [Preflight Validation](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/validation/README.md) - Cluster readiness and post-deployment validation checks
-- [Monitoring Setup Guide](../monitoring-stack/) - Optional Prometheus/Grafana configuration for dashboards and autoscaling
-- [KServe LLMInferenceService Samples](https://github.com/red-hat-data-services/kserve/tree/rhoai-3.4/docs/samples/llmisvc)
+
+* [KServe Chart README](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/charts/kserve/README.md) - KServe Helm chart details, PKI prerequisites, and OCI registry install
+* [Preflight Validation](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/validation/README.md) - Cluster readiness and post-deployment validation checks
+* [Monitoring Setup Guide](../monitoring-stack/) - Optional Prometheus/Grafana configuration for dashboards and autoscaling
+* [KServe LLMInferenceService Samples](https://github.com/red-hat-data-services/kserve/tree/rhoai-3.4/docs/samples/llmisvc)

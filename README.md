@@ -1,4 +1,4 @@
-# rhaii-on-xks
+# Red Hat AI Inference on managed Kubernetes
 
 Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLMInferenceService) on managed Kubernetes platforms (AKS, CoreWeave).
 

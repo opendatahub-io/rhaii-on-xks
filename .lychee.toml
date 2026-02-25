@@ -1,0 +1,14 @@
+# https://lychee.cli.rs/usage/config/
+include_mail = false
+max_concurrency = 16
+max_retries = 3
+user_agent = "Mozilla/5.0 (compatible; lychee/0.18; +https://github.com/lycheeverse/lychee)"
+timeout = 30
+accept = [200, 203, 429]
+include_fragments = false
+include_verbatim = true
+exclude = [
+  "^https?://[0-9]+\\.xx\\.",
+  "^hf://",
+  "^registry\\.redhat\\.io",
+]

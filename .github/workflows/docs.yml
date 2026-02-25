@@ -1,0 +1,49 @@
+name: Build docs
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/configure-pages@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+      - run: pip install zensical
+      - name: Copy README to docs with fixed relative links
+        run: |
+          python3 -c "
+          import re, os
+          repo_url = os.environ['REPO_URL']
+          with open('README.md') as f:
+              content = f.read()
+          # Strip ./docs/ prefix so links resolve within the docs directory
+          content = content.replace('./docs/', './')
+          # Convert remaining relative links with directory paths to absolute GitHub URLs
+          # (these point to repo files outside docs/, e.g. ./validation/README.md)
+          content = re.sub(
+              r'(\[[^\]]*\])\(\./([^)]*\/[^)]*)\)',
+              rf'\1({repo_url}/blob/main/\2)',
+              content,
+          )
+          with open('docs/index.md', 'w') as f:
+              f.write(content)
+          "
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+      - run: zensical build --clean
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: deployment
