@@ -83,7 +83,7 @@ Red Hat AI Inference Server images are hosted on `registry.redhat.io` and requir
    podman pull registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle:3.2
 
    # Verify access to RHAIIS vLLM image
-   podman pull registry.redhat.io/rhaiis-tech-preview/vllm-openai-rhel9:latest
+   podman pull registry.redhat.io/rhaiis/vllm-cuda-rhel9:latest
    ```
 
    Credentials are stored automatically in `~/.config/containers/auth.json` after successful login.
@@ -586,7 +586,7 @@ make deploy-kserve
 | Istio | 1.27.x | Dynamic resolution via `v1.27-latest` |
 | LeaderWorkerSet | 1.0 | `registry.k8s.io/lws/lws-controller` |
 | KServe Controller | 0.15 (chart 3.4.0-ea.1) | `registry.redhat.io` (via `charts/kserve/`) |
-| vLLM | Latest | `registry.redhat.io/rhaiis-tech-preview/vllm-openai-rhel9` |
+| vLLM | Latest | `registry.redhat.io/rhaiis/vllm-cuda-rhel9` |
 
 ### API Versions
 

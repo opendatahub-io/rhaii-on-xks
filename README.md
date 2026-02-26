@@ -56,8 +56,11 @@ Username: {REGISTRY-SERVICE-ACCOUNT-USERNAME}
 Password: {REGISTRY-SERVICE-ACCOUNT-PASSWORD}
 Login Succeeded!
 
-# Verify it works
+# Verify it works (Sail Operator)
 $ podman pull registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle:3.2
+
+# Verify vLLM image access
+$ podman pull registry.redhat.io/rhaiis/vllm-cuda-rhel9:latest
 ```
 
 Then configure `values.yaml`:
