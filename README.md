@@ -1,8 +1,8 @@
-# Red Hat AI Inference on managed Kubernetes
+# Red Hat AI Inference Stack for Other Kubernetes
 
-Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLMInferenceService) on managed Kubernetes platforms (AKS, CoreWeave).
+Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLMInferenceService) on other Kubernetes platforms (AKS, CoreWeave).
 
-> **Getting started?** See the [Deploying Red Hat AI Inference Server on Managed Kubernetes](./docs/deploying-llm-d-on-managed-kubernetes.md) guide for step-by-step deployment instructions.
+> **Getting started?** See the [Deploying Red Hat AI Inference Server](./docs/deploying-llm-d-on-managed-kubernetes.md) guide for step-by-step deployment instructions.
 
 ## Related Repositories
 

@@ -1,4 +1,4 @@
-# Deploying Red Hat AI Inference Server on Managed Kubernetes
+# Deploying Red Hat AI Inference Server on Other Kubernetes
 
 **Product:** Red Hat AI Inference Server (RHAIIS)
 **Version:** 3.4
