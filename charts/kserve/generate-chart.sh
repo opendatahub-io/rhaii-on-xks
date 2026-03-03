@@ -5,9 +5,9 @@
 #   ./generate-chart.sh --overlay PATH [OPTIONS]
 #
 # Options:
-#   --overlay PATH              Path to Kustomize overlay (required)
-#   --tag TAG                   Image tag for quay.io replacements (default: 3.4.0-ea.1)
-#   --branch BRANCH             RHOAI-Build-Config branch for image mappings (default: rhoai-3.4)
+#   --overlay PATH              Local path to Kustomize overlay (required)
+#   --tag TAG                   Image tag for quay.io replacements (default: rhoai-3.4-ea.1)
+#   --branch BRANCH             RHOAI-Build-Config branch for image mappings (default: rhoai-3.4-ea.1)
 #   --skip-image-replacement    Skip image replacement (use original images from overlay)
 #   --help                      Show this help message
 #
@@ -21,8 +21,8 @@ CHART_DIR="${SCRIPT_DIR}"
 FILES_DIR="${CHART_DIR}/files"
 
 # Defaults
-TAG="3.4.0-ea.1"
-BRANCH="rhoai-3.4"
+TAG="rhoai-3.4-ea.1"
+BRANCH="rhoai-3.4-ea.1"
 KUSTOMIZE_OVERLAY=""
 SKIP_IMAGE_REPLACEMENT="false"
 

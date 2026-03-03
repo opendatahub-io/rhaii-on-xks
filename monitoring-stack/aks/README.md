@@ -1,15 +1,12 @@
 # Monitoring on AKS
 
-## Prerequisites
+AKS offers two Prometheus options: self-hosted or Azure Managed Prometheus.
 
-| Prerequisite | How to Check |
-|--------------|--------------|
-| **Prometheus running** | See options below |
-| **ServiceMonitor/PodMonitor CRDs** | `kubectl get crd servicemonitors.monitoring.coreos.com` |
+**Prerequisites:** KServe must be deployed first. See the [deployment guide](../../docs/deploying-llm-d-on-managed-kubernetes.md) if not yet completed.
 
-## Prometheus Options
+## 1. Install Prometheus
 
-Choose one:
+Choose one of the following options:
 
 ### Option 1: Self-hosted kube-prometheus-stack (Recommended)
 
@@ -23,55 +20,80 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false
 ```
 
-CRDs are included automatically.
+This automatically installs:
+- Prometheus server
+- ServiceMonitor/PodMonitor CRDs
+- Grafana
+
+**Verify installation:**
+
+```bash
+# Check CRDs
+kubectl get crd servicemonitors.monitoring.coreos.com podmonitors.monitoring.coreos.com
+
+# Check Prometheus is running
+kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus
+```
 
 ### Option 2: Azure Managed Prometheus
 
-1. Enable in Azure Portal: AKS cluster > Monitoring > Enable Managed Prometheus
+1. Enable in Azure Portal: **AKS cluster → Monitoring → Enable Managed Prometheus**
 2. Install CRDs separately:
    ```bash
+   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
    helm install prometheus-operator-crds prometheus-community/prometheus-operator-crds
    ```
 
-## Verify Prerequisites
+**Verify installation:**
 
 ```bash
-# CRDs exist
-kubectl get crd servicemonitors.monitoring.coreos.com
-kubectl get crd podmonitors.monitoring.coreos.com
+# Check CRDs
+kubectl get crd servicemonitors.monitoring.coreos.com podmonitors.monitoring.coreos.com
 
-# Prometheus is running (self-hosted)
-kubectl get pods -n monitoring | grep prometheus
-
-# Or Azure Managed Prometheus
-kubectl get pods -n kube-system | grep ama-metrics
+# Check Azure metrics agent is running
+kubectl get pods -n kube-system -l rsName=ama-metrics
 ```
 
-## Enable Monitoring in KServe
+## 2. Enable Monitoring in KServe
 
 By default, monitoring is disabled. Enable it:
 
 ```bash
+# Using make (recommended)
+make enable-monitoring
+
+# Or manually
 kubectl set env deployment/kserve-controller-manager \
   -n opendatahub \
   LLMISVC_MONITORING_DISABLED=false
 ```
 
-KServe automatically creates `PodMonitor` resources for vLLM pods when LLMInferenceService is deployed.
+When enabled, KServe automatically creates `PodMonitor` resources for vLLM pods.
 
-## Verify
+## 3. Verify Monitoring Works
+
+After deploying an LLMInferenceService:
 
 ```bash
-# Check PodMonitors created by KServe
+# Check PodMonitors were created (replace with your namespace, e.g., llm-inference)
 kubectl get podmonitors -n <llmisvc-namespace>
 
-# Check targets in Prometheus
+# Check Prometheus is scraping targets
 kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
-# Open http://localhost:9090/targets
+# Open http://localhost:9090/targets and look for vLLM endpoints
 ```
 
-## Access Grafana (Self-hosted only)
+## 4. Access Dashboards
 
+### Self-hosted kube-prometheus-stack
+
+**Prometheus:**
+```bash
+kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
+```
+Open http://localhost:9090
+
+**Grafana:**
 ```bash
 # Port forward
 kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
@@ -79,5 +101,10 @@ kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 # Get password
 kubectl get secret -n monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d
 ```
-
 Open http://localhost:3000 (user: admin)
+
+### Azure Managed Prometheus
+
+**Prometheus:** Access via Azure Portal → Azure Monitor workspace → Metrics Explorer, or use [Azure Managed Grafana](https://learn.microsoft.com/en-us/azure/managed-grafana/) connected to your Prometheus workspace.
+
+**Grafana:** Azure Managed Prometheus does not include Grafana. Use [Azure Managed Grafana](https://learn.microsoft.com/en-us/azure/managed-grafana/) or deploy Grafana separately.

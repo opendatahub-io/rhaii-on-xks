@@ -110,26 +110,29 @@ The chart resources are generated from Kustomize overlays using the `generate-ch
 
 ### Options
 
-| Option            | Default      | Description                                  |
-|-------------------|--------------|----------------------------------------------|
-| `--overlay PATH`  | (required)   | Path to Kustomize overlay                    |
-| `--tag TAG`       | `3.4.0-ea.1` | Image tag for quay.io replacements           |
-| `--branch BRANCH` | `rhoai-3.4`  | RHOAI-Build-Config branch for image mappings |
+| Option            | Default         | Repository               | Description                                    |
+|-------------------|-----------------|--------------------------|------------------------------------------------|
+| `--overlay PATH`  | (required)      | -                        | Path to local KServe Kustomize overlay               |
+| `--tag TAG`       | `rhoai-3.4-ea.1`    | -                        | RHOAI release version for container images stored in quay.io    |
+| `--branch BRANCH` | `rhoai-3.4-ea.1` | [RHOAI-Build-Config](https://github.com/red-hat-data-services/RHOAI-Build-Config)       | Branch to fetch CSV with image SHA digests    |
 
 ### Example
 
 ```bash
+# 1. Clone KServe repository
+git clone https://github.com/red-hat-data-services/kserve.git -b rhoai-3.4-ea.1
+
+# 2. Generate chart
 ./generate-chart.sh \
-  --overlay ~/kserve/config/overlays/odh-xks \
-  --branch rhoai-3.4 \
-  --tag 3.4.0-ea.1
+  --overlay ./kserve/config/overlays/odh-xks \
+  --branch rhoai-3.4-ea.1 \
+  --tag rhoai-3.4-ea.1
 ```
 
 ### Image Replacement Logic
 
-1. **quay.io images** are replaced with `registry.redhat.io` equivalents using the specified tag
-2. **registry.redhat.io images** are replaced with exact SHA references from the RHOAI-Build-Config
-   ClusterServiceVersion
+1. **quay.io images** → `registry.redhat.io:TAG` (using `--tag` value)
+2. **registry.redhat.io:TAG** → `registry.redhat.io@sha256:...` (using exact SHAs from [RHOAI-Build-Config](https://github.com/red-hat-data-services/RHOAI-Build-Config) CSV by `--branch` branch)
 
 ## CI/CD Workflows
 
@@ -137,12 +140,16 @@ The chart resources are generated from Kustomize overlays using the `generate-ch
 
 Automatically regenerates the chart from upstream KServe and creates a PR if changes are detected.
 
-**Inputs:**
+**Workflow Inputs:**
 
-- `kserve_repo`: KServe repository (default: `red-hat-data-services/kserve`)
-- `kserve_ref`: KServe branch/tag (default: `rhoai-3.4`)
-- `rhoai_branch`: RHOAI-Build-Config branch (default: `rhoai-3.4`)
-- `image_tag`: Image tag for quay.io replacements (default: `3.4.0-ea.1`)
+| Input          | Default                        | Used For                                    |
+|----------------|--------------------------------|---------------------------------------------|
+| `kserve_repo`  | `red-hat-data-services/kserve` | Source repository for KServe overlay        |
+| `kserve_ref`   | `rhoai-3.4-ea.1`                    | KServe repository branch/tag                |
+| `rhoai_branch` | `rhoai-3.4-ea.1`                    | Maps to `--branch` ([RHOAI-Build-Config](https://github.com/red-hat-data-services/RHOAI-Build-Config) CSV) |
+| `image_tag`    | `3.4.0-ea.1`                   | Maps to `--tag` (RHOAI release version)     |
+
+**Note:** The workflow clones KServe at `kserve_ref`, then runs `generate-chart.sh` with `--branch ${rhoai_branch}` and `--tag ${image_tag}`.
 
 ### Release (on push to main)
 
