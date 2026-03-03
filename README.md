@@ -117,6 +117,16 @@ make status
 
 For deploying LLM inference services, GPU requirements, and testing inference, see the [full deployment guide](./docs/deploying-llm-d-on-managed-kubernetes.md).
 
+### Optional: Monitoring Setup
+
+Monitoring is **disabled by default** and only needed for:
+- Grafana dashboards and visualization
+- Workload Variant Autoscaler (WVA) - **required** for autoscaling
+
+**Setup:**
+1. Install Prometheus - see [Monitoring Stack Guide](./monitoring-stack/) for platform-specific setup (AKS, CoreWeave)
+2. Enable monitoring: `make enable-monitoring`
+
 ---
 
 ## Usage
@@ -195,6 +205,9 @@ rhaii-on-xks/
 │   ├── sail-operator/            # Sail/Istio operator Helm chart
 │   ├── lws-operator/             # LWS operator Helm chart
 │   └── kserve/                   # KServe controller Helm chart (auto-generated)
+├── monitoring-stack/             # Optional Prometheus setup guides for monitoring and autoscaling
+│   ├── aks/                      # AKS-specific monitoring guide
+│   └── cks/                      # CoreWeave-specific monitoring guide
 ├── validation/                   # Preflight validation checks
 │   ├── llmd_xks_checks.py       # Validation script
 │   ├── Containerfile             # Container build
