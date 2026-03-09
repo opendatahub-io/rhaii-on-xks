@@ -1,14 +1,16 @@
-# Deploying Red Hat AI Inference Server on Other Kubernetes
+# Deploying Red Hat AI Inference Server: Distributed Inference with llm-d
 
 **Product:** Red Hat AI Inference Server (RHAIIS)
 **Version:** 3.4
 **Platforms:** Azure Kubernetes Service (AKS), CoreWeave Kubernetes Service (CKS)
 
+> **Deploying on OpenShift?** See the [Deploying on OpenShift](./deploying-on-openshift.md) guide instead.
+
 ---
 
 ## Executive Summary
 
-This guide provides step-by-step instructions for deploying Red Hat AI Inference Server on managed Kubernetes platforms. Red Hat AI Inference Server enables enterprise-grade Large Language Model (LLM) inference with features including:
+This guide provides step-by-step instructions for deploying Distributed Inference with llm-d for Red Hat AI Inference Server. Distributed Inference with llm-d Server enables enterprise-grade Large Language Model (LLM) inference with features including:
 
 - **Intelligent request routing** using the Endpoint Picker Processor (EPP)
 - **Disaggregated serving** with prefill-decode separation for optimal throughput
@@ -40,10 +42,10 @@ This guide provides step-by-step instructions for deploying Red Hat AI Inference
 
 | Requirement | Specification |
 |-------------|---------------|
-| Kubernetes Version | 1.28 or later |
+| Kubernetes Version | 1.33+ or later |
 | Supported Platforms | AKS, CKS (CoreWeave) |
-| GPU Nodes | NVIDIA A10, A100, or H100 (for GPU workloads) |
-| NVIDIA Device Plugin | Installed and configured |
+| GPU Nodes | Supported NVIDIA/AMD GPU nodes |
+| GPU Device Plugin | Installed and configured ([NVIDIA](https://github.com/NVIDIA/k8s-device-plugin), [AMD](https://github.com/ROCm/k8s-device-plugin)) |
 
 ### 1.2 Client Tools
 
@@ -51,13 +53,13 @@ Install the following tools on your workstation:
 
 | Tool | Minimum Version | Purpose |
 |------|-----------------|---------|
-| `kubectl` | 1.28+ | Kubernetes CLI |
-| `helm` | 3.17+ | Helm package manager |
-| `helmfile` | 0.160+ | Declarative Helm deployments |
+| [`kubectl`](https://kubernetes.io/docs/tasks/tools/) | 1.33+ | Kubernetes CLI |
+| [`helm`](https://helm.sh/docs/intro/install/) | 3.17+ | Helm package manager |
+| [`helmfile`](https://github.com/helmfile/helmfile#installation) | 0.160+ | Declarative Helm deployments |
 
 ### 1.3 Red Hat Registry Authentication
 
-Red Hat AI Inference Server images are hosted on `registry.redhat.io` and require authentication.
+RHAIIS images are hosted on `registry.redhat.io` and require authentication.
 
 **Procedure:**
 
@@ -123,7 +125,7 @@ kubectl describe nodes | grep -A5 "nvidia.com/gpu"
 
 ## 1.5 Preflight Validation (Recommended)
 
-Run the preflight validation checks to verify your cluster is properly configured:
+Run the [preflight validation](../validation/README.md) checks to verify your cluster is properly configured:
 
 ```bash
 # Build the validation container
@@ -153,15 +155,15 @@ See the [Preflight Validation README](../validation/README.md) for configuration
 
 ## 2. Architecture Overview
 
-Red Hat AI Inference Server on managed Kubernetes consists of the following components:
+Distributed Inference with llm-d on Red Hat AI Inference consists of the following components:
 
-| Component | Description |
-|-----------|-------------|
-| **cert-manager** | Manages TLS certificates for mTLS between components |
-| **Istio (Sail Operator)** | Provides Gateway API implementation for inference routing |
-| **LeaderWorkerSet (LWS)** | Enables multi-node inference for large models |
-| **KServe Controller** | Manages LLMInferenceService lifecycle |
-| **Inference Gateway** | Routes external traffic to inference endpoints |
+| Component | Version | Description |
+|-----------|---------|-------------|
+| **cert-manager** | 1.15.2 | Manages TLS certificates for mTLS between components |
+| **Istio (Sail Operator)** | 3.2.1 / 1.27.x | Provides Gateway API implementation for inference routing |
+| **LeaderWorkerSet (LWS)** | 1.0 | Enables multi-node inference for large models |
+| **KServe Controller** | 0.15 (chart 3.4.0-ea.1) | Manages LLMInferenceService lifecycle |
+| **Gateway API** | 1.4.0 | Routes external traffic to inference endpoints (also compatible with 1.3.0+) |
 
 ### Component Interaction
 
@@ -586,7 +588,9 @@ make deploy-kserve
 | Istio | 1.27.x | Dynamic resolution via `v1.27-latest` |
 | LeaderWorkerSet | 1.0 | `registry.k8s.io/lws/lws-controller` |
 | KServe Controller | 0.15 (chart 3.4.0-ea.1) | `registry.redhat.io` (via `charts/kserve/`) |
-| vLLM | Latest | `registry.redhat.io/rhaiis/vllm-cuda-rhel9` |
+| Gateway API | 1.4.0 | Also compatible with 1.3.0+ |
+| vLLM (CUDA) | 3.4.0-ea.1 | `registry.redhat.io/rhaiis/vllm-cuda-rhel9` |
+| vLLM (ROCm) | 3.4.0-ea.1 | `registry.redhat.io/rhaiis/vllm-rocm-rhel9` |
 
 ### API Versions
 

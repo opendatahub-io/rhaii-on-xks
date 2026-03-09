@@ -1,8 +1,8 @@
-# Red Hat AI Inference Stack for Other Kubernetes
+# Red Hat AI Inference Stack for Kubernetes
 
-Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLMInferenceService) on other Kubernetes platforms (AKS, CoreWeave).
+Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLMInferenceService) on Kubernetes platforms (AKS, CoreWeave, OpenShift).
 
-> **Getting started?** See the [Deploying Red Hat AI Inference Server](./docs/deploying-llm-d-on-managed-kubernetes.md) guide for step-by-step deployment instructions.
+> **Getting started?** See the [Deploying on AKS/CoreWeave](./docs/deploying-llm-d-on-managed-kubernetes.md) guide or the [Deploying on OpenShift](./docs/deploying-on-openshift.md) guide for step-by-step deployment instructions.
 
 ## Related Repositories
 
@@ -15,23 +15,24 @@ Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLM
 | Component | App Version | Description |
 |-----------|-------------|-------------|
 | cert-manager-operator | 1.15.2 | TLS certificate management |
-| sail-operator (Istio) | 3.2.x | Gateway API for inference routing |
+| sail-operator (Istio) | 3.2.1 / 1.27.x | Gateway API for inference routing |
 | lws-operator | 1.0 | LeaderWorkerSet controller for multi-node workloads |
 | kserve | 3.4.0-ea.1 | KServe controller for LLMInferenceService lifecycle |
+| Gateway API | 1.4.0 | Standard Kubernetes ingress for inference routing (also compatible with 1.3.0+) |
 
 ### Version Compatibility
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| OSSM (Sail Operator) | 3.2.x | Gateway API for inference routing |
+| OSSM (Sail Operator) | 3.2.1 | Gateway API for inference routing |
 | Istio | v1.27.x | Service mesh |
 | InferencePool API | v1 | `inference.networking.k8s.io/v1` |
 | KServe | rhoai-3.4+ | LLMInferenceService controller |
 
 ## Prerequisites
 
-- Kubernetes cluster (AKS or CoreWeave) - see [llm-d-xks-aks](https://github.com/kwozyman/llm-d-xks-aks) for AKS provisioning
-- `kubectl`, `helm` (v3.17+), `helmfile`, `helm-diff` plugin
+- Kubernetes cluster (AKS, CoreWeave, or OpenShift) - see [llm-d-xks-aks](https://github.com/kwozyman/llm-d-xks-aks) for AKS provisioning
+- [`kubectl`](https://kubernetes.io/docs/tasks/tools/) (1.33+), [`helm`](https://helm.sh/docs/intro/install/) (v3.17+), [`helmfile`](https://github.com/helmfile/helmfile#installation), `helm-diff` plugin
 - Red Hat account (for Sail Operator and vLLM images from `registry.redhat.io`)
 
 **Cluster readiness check (optional):** Run `cd validation && make container && make run` to verify cloud provider, GPU availability, and instance types before deploying. CRD checks will pass only after operators are deployed. See [Preflight Validation](./validation/README.md).
@@ -59,8 +60,11 @@ Login Succeeded!
 # Verify it works (Sail Operator)
 $ podman pull registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle:3.2
 
-# Verify vLLM image access
-$ podman pull registry.redhat.io/rhaiis/vllm-cuda-rhel9:latest
+# Verify vLLM image access (CUDA)
+$ podman pull registry.redhat.io/rhaiis/vllm-cuda-rhel9
+
+# Verify vLLM image access (ROCm/AMD)
+$ podman pull registry.redhat.io/rhaiis/vllm-rocm-rhel9
 ```
 
 Then configure `values.yaml`:
