@@ -151,18 +151,9 @@ charts/cert-manager-operator/
 ## Upgrade Process
 
 ```bash
-# Update to new bundle version
-./scripts/update-bundle.sh v1.18.0
-
-# Review changes
-git diff
+# (Optional) Update to a new bundle version
+./scripts/update-bundle.sh <version>
 
 # Deploy
-helmfile apply
+make deploy
 ```
-
-The update script:
-1. Extracts manifests from Red Hat's OLM bundle
-2. Applies olm-extractor transformations
-3. Templatizes namespace references
-4. Preserves custom templates (pull-secret, serviceaccounts-cert-manager)
