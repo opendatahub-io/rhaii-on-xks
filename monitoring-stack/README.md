@@ -17,7 +17,9 @@
 | **Prometheus running** | To scrape and store metrics |
 | **ServiceMonitor/PodMonitor CRDs** | So KServe can create monitors for vLLM pods |
 
-Any Prometheus deployment works - self-hosted, Azure Managed, or other options.
+Any Prometheus deployment works - self-hosted, Azure Managed, or other options. Compatible with prometheus-operator v0.78.2+.
+
+> **Note:** The LWS operator chart includes the `ServiceMonitor` CRD (v0.78.2) for clusters without a monitoring stack. If you install a full Prometheus stack, ensure it uses a compatible version (v0.78.2 or later).
 
 ## Enabling Monitoring with KServe
 

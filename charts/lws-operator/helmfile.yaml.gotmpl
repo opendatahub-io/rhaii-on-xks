@@ -30,13 +30,19 @@ releases:
           dockerConfigJson: {{ exec "cat" (list .Values.authFile) | quote }}
 {{- end }}
     hooks:
-      # Note: LWS CRDs are now in crds/ directory and installed by Helm with SSA
       - events: ["presync"]
         showlogs: true
         command: bash
         args:
           - -c
           - "kubectl create namespace {{ .Values.namespace | default "openshift-lws-operator" }} --dry-run=client -o yaml | kubectl apply -f -"
+      # Apply ServiceMonitor CRD only if not already present (required by LWS operator on non-OpenShift clusters)
+      - events: ["presync"]
+        showlogs: true
+        command: bash
+        args:
+          - -c
+          - "kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1 || kubectl apply -f crds/customresourcedefinition-servicemonitors-monitoring-coreos-com.yaml"
       # Pre-create lws-controller-manager ServiceAccount with imagePullSecrets
       # The operator will adopt this SA when it creates the controller
       - events: ["presync"]
