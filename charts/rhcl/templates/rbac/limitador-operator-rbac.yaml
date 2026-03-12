@@ -1,0 +1,63 @@
+{{- if and .Values.rbac.create .Values.operators.limitador.enabled }}
+apiVersion: {{ include "rhcl.rbac.apiVersion" . }}
+kind: ClusterRole
+metadata:
+  name: limitador-operator-manager-role
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+rules:
+  # Pods/ServiceAccounts: operator creates and manages Limitador component deployments
+  # Secrets/Services: operator manages pull secrets and component services
+  # These permissions match the upstream RHCL operator CSV extracted via olm-extractor
+  - apiGroups: [""]
+    resources: [events, configmaps, secrets, services, serviceaccounts, pods]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [apps]
+    resources: [deployments/status]
+    verbs: [get, patch, update]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [limitador.kuadrant.io]
+    resources: [limitadors]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [limitador.kuadrant.io]
+    resources: [limitadors/status, limitadors/finalizers]
+    verbs: [get, patch, update]
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [monitoring.coreos.com]
+    resources: [servicemonitors, podmonitors]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [policy]
+    resources: [poddisruptionbudgets]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+  - apiGroups: [authorization.k8s.io]
+    resources: [subjectaccessreviews]
+    verbs: [create]
+---
+apiVersion: {{ include "rhcl.rbac.apiVersion" . }}
+kind: ClusterRoleBinding
+metadata:
+  name: limitador-operator-manager-rolebinding
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: limitador-operator-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: limitador-operator-controller-manager
+    namespace: {{ .Values.namespaces.operators }}
+{{- end }}

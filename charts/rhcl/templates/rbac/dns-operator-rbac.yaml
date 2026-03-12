@@ -1,0 +1,57 @@
+{{- if and .Values.rbac.create .Values.operators.dns.enabled }}
+apiVersion: {{ include "rhcl.rbac.apiVersion" . }}
+kind: ClusterRole
+metadata:
+  name: dns-operator-manager-role
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [events, configmaps, secrets, services]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [endpoints]
+    verbs: [get, list, watch]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [kuadrant.io]
+    resources: [dnsrecords, dnshealthcheckprobes, dnspolicies]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [kuadrant.io]
+    resources: [dnsrecords/status, dnshealthcheckprobes/status, dnspolicies/status]
+    verbs: [get, patch, update]
+  - apiGroups: [kuadrant.io]
+    resources: [dnsrecords/finalizers, dnshealthcheckprobes/finalizers, dnspolicies/finalizers]
+    verbs: [update]
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [gateways, httproutes]
+    verbs: [get, list, watch]
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [gateways/status]
+    verbs: [get]
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+  - apiGroups: [authorization.k8s.io]
+    resources: [subjectaccessreviews]
+    verbs: [create]
+---
+apiVersion: {{ include "rhcl.rbac.apiVersion" . }}
+kind: ClusterRoleBinding
+metadata:
+  name: dns-operator-manager-rolebinding
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dns-operator-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: dns-operator-controller-manager
+    namespace: {{ .Values.namespaces.operators }}
+{{- end }}

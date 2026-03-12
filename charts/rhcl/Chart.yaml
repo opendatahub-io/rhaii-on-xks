@@ -1,0 +1,24 @@
+apiVersion: v2
+name: rhcl
+description: Red Hat Connectivity Link (RHCL) - Meta-operator for API Gateway, Authentication, and Rate Limiting
+type: application
+version: 1.2.0
+appVersion: "1.2.0"
+keywords:
+  - rhcl
+  - kuadrant
+  - authorino
+  - limitador
+  - dns
+  - api-gateway
+  - authentication
+  - rate-limiting
+  - service-mesh
+  - openshift
+maintainers:
+  - name: Red Hat
+sources:
+  - https://github.com/Kuadrant/kuadrant-operator
+  - https://github.com/Kuadrant/authorino-operator
+  - https://github.com/Kuadrant/limitador-operator
+  - https://github.com/Kuadrant/dns-operator

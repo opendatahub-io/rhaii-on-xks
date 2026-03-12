@@ -1,0 +1,334 @@
+helmDefaults:
+  wait: true
+  timeout: 600
+
+environments:
+  default:
+    values:
+      - values.yaml
+
+---
+
+repositories: []
+
+releases:
+  - name: rhcl
+    namespace: {{ .Values.namespaces.operators | default "kuadrant-operators" }}
+    chart: ./
+    createNamespace: true
+    values:
+      - values.yaml
+{{- if .Values.useSystemPodmanAuth }}
+      - images:
+          pullSecret:
+            dockerConfigJson: {{ exec "cat" (list (env "HOME" | printf "%s/.config/containers/auth.json")) | quote }}
+{{- else if .Values.images.pullSecret.dockerConfigJson }}
+      - images:
+          pullSecret:
+            dockerConfigJson: {{ .Values.images.pullSecret.dockerConfigJson | quote }}
+{{- else if .Values.pullSecretFile }}
+      {{- $home := env "HOME" }}
+      {{- if eq $home "" }}
+        {{- fail "pullSecretFile requires HOME environment variable to be set" }}
+      {{- end }}
+      {{- $resolvedPath := exec "realpath" (list "-e" .Values.pullSecretFile) | trim }}
+      {{- $homeWithSlash := printf "%s/" $home }}
+      {{- if and (ne $resolvedPath $home) (not (hasPrefix $homeWithSlash $resolvedPath)) }}
+        {{- fail (printf "pullSecretFile resolved path '%s' must be under HOME (%s)" $resolvedPath $home) }}
+      {{- end }}
+      - images:
+          pullSecret:
+            dockerConfigJson: {{ exec "cat" (list $resolvedPath) | quote }}
+{{- else if .Values.authFile }}
+      {{- $home := env "HOME" }}
+      {{- if eq $home "" }}
+        {{- fail "authFile requires HOME environment variable to be set" }}
+      {{- end }}
+      {{- $resolvedPath := exec "realpath" (list "-e" .Values.authFile) | trim }}
+      {{- $homeWithSlash := printf "%s/" $home }}
+      {{- if and (ne $resolvedPath $home) (not (hasPrefix $homeWithSlash $resolvedPath)) }}
+        {{- fail (printf "authFile resolved path '%s' must be under HOME (%s)" $resolvedPath $home) }}
+      {{- end }}
+      - images:
+          pullSecret:
+            dockerConfigJson: {{ exec "cat" (list $resolvedPath) | quote }}
+{{- end }}
+    hooks:
+      # ======================================================================
+      # PREUNINSTALL: Clean up Kuadrant instance before removing operators
+      # ======================================================================
+
+{{- if .Values.instance.kuadrant.enabled }}
+      - events: ["preuninstall"]
+        showlogs: true
+        command: bash
+        args:
+          - -ceu
+          - |
+            INSTANCE_NS="$1"
+            KUADRANT_NAME="$2"
+            echo "Cleaning up Kuadrant instance..."
+
+            if kubectl get kuadrant "$KUADRANT_NAME" -n "$INSTANCE_NS" >/dev/null 2>&1; then
+              echo "Deleting Kuadrant CR..."
+              kubectl delete kuadrant "$KUADRANT_NAME" -n "$INSTANCE_NS" --wait=false
+
+              echo "Waiting for sub-operator instances to be deleted..."
+              for i in $(seq 1 30); do
+                AUTH_COUNT=$(kubectl get authorino -n "$INSTANCE_NS" --no-headers 2>/dev/null | wc -l)
+                LIM_COUNT=$(kubectl get limitador -n "$INSTANCE_NS" --no-headers 2>/dev/null | wc -l)
+                if [ "$AUTH_COUNT" -eq 0 ] && [ "$LIM_COUNT" -eq 0 ]; then
+                  echo "All sub-operator instances deleted"
+                  break
+                fi
+                echo "Waiting... (${i}/30)"
+                sleep 2
+              done
+
+              for res in authorino limitador kuadrant; do
+                kubectl get "$res" -n "$INSTANCE_NS" -o name 2>/dev/null | while read -r cr; do
+                  kubectl patch "$cr" -n "$INSTANCE_NS" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+                done
+              done
+
+              echo "Kuadrant instance cleanup complete"
+            else
+              echo "Kuadrant CR not found, skipping cleanup"
+            fi
+          - --
+          - {{ .Values.namespaces.instances | default "kuadrant-system" | quote }}
+          - {{ .Values.instance.kuadrant.name | default "kuadrant" | quote }}
+{{- end }}
+
+      # ======================================================================
+      # PRESYNC: Create namespaces and pre-create ServiceAccounts
+      # ======================================================================
+
+      - events: ["presync"]
+        showlogs: true
+        command: bash
+        args:
+          - -ceu
+          - "kubectl create namespace \"$1\" --dry-run=client -o yaml | kubectl apply -f -"
+          - --
+          - {{ .Values.namespaces.operators | default "kuadrant-operators" | quote }}
+
+      - events: ["presync"]
+        showlogs: true
+        command: bash
+        args:
+          - -ceu
+          - "kubectl create namespace \"$1\" --dry-run=client -o yaml | kubectl apply -f -"
+          - --
+          - {{ .Values.namespaces.instances | default "kuadrant-system" | quote }}
+
+      - events: ["presync"]
+        showlogs: true
+        command: kubectl
+        args:
+          - apply
+          - --server-side
+          - --force-conflicts
+          - -f
+          - manifests-presync/
+
+      # ======================================================================
+      # POSTSYNC: Wait for operators, create Kuadrant CR, validate
+      # ======================================================================
+
+      - events: ["postsync"]
+        showlogs: true
+        command: bash
+        args:
+          - -ceu
+          - |
+            OPERATOR_NS="$1"
+            TIMEOUT=300
+            echo "Waiting for RHCL operators to be ready..."
+
+{{- if .Values.operators.kuadrant.enabled }}
+            echo "Waiting for kuadrant-operator-controller-manager..."
+            kubectl wait --for=condition=Available deployment/kuadrant-operator-controller-manager -n "$OPERATOR_NS" --timeout=${TIMEOUT}s || exit 1
+{{- end }}
+{{- if .Values.operators.authorino.enabled }}
+            echo "Waiting for authorino-operator..."
+            kubectl wait --for=condition=Available deployment/authorino-operator -n "$OPERATOR_NS" --timeout=${TIMEOUT}s || exit 1
+{{- end }}
+{{- if .Values.operators.limitador.enabled }}
+            echo "Waiting for limitador-operator-controller-manager..."
+            kubectl wait --for=condition=Available deployment/limitador-operator-controller-manager -n "$OPERATOR_NS" --timeout=${TIMEOUT}s || exit 1
+{{- end }}
+{{- if .Values.operators.dns.enabled }}
+            echo "Waiting for dns-operator-controller-manager..."
+            kubectl wait --for=condition=Available deployment/dns-operator-controller-manager -n "$OPERATOR_NS" --timeout=${TIMEOUT}s || exit 1
+{{- end }}
+
+            echo "All operators are ready!"
+          - --
+          - {{ .Values.namespaces.operators | default "kuadrant-operators" | quote }}
+
+{{- if .Values.instance.kuadrant.enabled }}
+      - events: ["postsync"]
+        showlogs: true
+        command: bash
+        args:
+          - -ceu
+          - |
+            cat <<EOF | kubectl apply -f -
+            apiVersion: kuadrant.io/v1beta1
+            kind: Kuadrant
+            metadata:
+              name: $1
+              namespace: $2
+            spec: {}
+            EOF
+          - --
+          - {{ .Values.instance.kuadrant.name | default "kuadrant" | quote }}
+          - {{ .Values.namespaces.instances | default "kuadrant-system" | quote }}
+
+{{- if .Values.images.pullSecret.create }}
+      - events: ["postsync"]
+        showlogs: true
+        command: bash
+        args:
+          - -ceu
+          - |
+            INSTANCE_NS="$1"
+            PULL_SECRET="$2"
+            echo "Configuring imagePullSecrets for component ServiceAccounts..."
+
+            echo "Waiting for Limitador CR..."
+            for i in $(seq 1 60); do
+              if kubectl get limitador -n "$INSTANCE_NS" >/dev/null 2>&1; then
+                echo "Limitador CR found"
+                break
+              fi
+              sleep 2
+            done
+
+            echo "Patching default ServiceAccount..."
+            kubectl patch serviceaccount default -n "$INSTANCE_NS" \
+              -p "{\"imagePullSecrets\": [{\"name\": \"$PULL_SECRET\"}]}" || true
+
+            if kubectl get limitador -n "$INSTANCE_NS" >/dev/null 2>&1; then
+              echo "Configuring Limitador imagePullSecrets..."
+              kubectl patch limitador limitador -n "$INSTANCE_NS" \
+                --type=merge \
+                -p "{\"spec\":{\"imagePullSecrets\":[{\"name\":\"$PULL_SECRET\"}]}}" || true
+              kubectl delete pods -n "$INSTANCE_NS" -l limitador-resource=limitador --ignore-not-found=true
+            fi
+
+            echo "ImagePullSecrets configuration complete!"
+          - --
+          - {{ .Values.namespaces.instances | default "kuadrant-system" | quote }}
+          - {{ .Values.images.pullSecret.name | default "redhat-pull-secret" | quote }}
+{{- end }}
+
+      - events: ["postsync"]
+        showlogs: true
+        command: bash
+        args:
+          - -ceu
+          - |
+            echo "Waiting for Kuadrant instance to be ready..."
+            kubectl wait --for=condition=Ready "kuadrant/$1" -n "$2" --timeout=300s || {
+              echo "Kuadrant instance failed to become ready"
+              kubectl describe "kuadrant/$1" -n "$2"
+              exit 1
+            }
+            echo "Kuadrant instance is ready!"
+          - --
+          - {{ .Values.instance.kuadrant.name | default "kuadrant" | quote }}
+          - {{ .Values.namespaces.instances | default "kuadrant-system" | quote }}
+
+      - events: ["postsync"]
+        showlogs: true
+        command: bash
+        args:
+          - -ceu
+          - |
+            INSTANCE_NS="$1"
+            echo "Validating sub-operator instances..."
+            echo "Checking Authorino instance..."
+            kubectl get authorino -n "$INSTANCE_NS" || echo "WARNING: No Authorino instance found"
+            echo "Checking Limitador instance..."
+            kubectl get limitador -n "$INSTANCE_NS" || echo "WARNING: No Limitador instance found"
+            echo "RHCL deployment validation complete!"
+          - --
+          - {{ .Values.namespaces.instances | default "kuadrant-system" | quote }}
+{{- end }}
+
+      # ======================================================================
+      # POSTUNINSTALL: Clean up namespaces and CRDs
+      # ======================================================================
+
+      - events: ["postuninstall"]
+        showlogs: true
+        command: bash
+        args:
+          - -ceu
+          - |
+            INSTANCE_NS="$1"
+            OPERATOR_NS="$2"
+            echo "Cleaning up namespaces..."
+
+            for NS in "$INSTANCE_NS" "$OPERATOR_NS"; do
+              if kubectl get namespace "$NS" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}' 2>/dev/null | grep -q Helm; then
+                echo "Deleting namespace: $NS (Helm-managed)"
+                kubectl delete namespace "$NS" --wait=false
+                for i in $(seq 1 30); do
+                  if ! kubectl get namespace "$NS" >/dev/null 2>&1; then
+                    echo "Namespace $NS deleted"
+                    break
+                  fi
+                  echo "Waiting for $NS deletion... (${i}/30)"
+                  sleep 2
+                done
+              elif kubectl get namespace "$NS" >/dev/null 2>&1; then
+                echo "Skipping namespace $NS (not Helm-managed, may contain other workloads)"
+              fi
+            done
+            echo "Namespace cleanup complete!"
+          - --
+          - {{ .Values.namespaces.instances | default "kuadrant-system" | quote }}
+          - {{ .Values.namespaces.operators | default "kuadrant-operators" | quote }}
+
+      - events: ["postuninstall"]
+        showlogs: true
+        command: bash
+        args:
+          - -ceu
+          - |
+            echo "Cleaning up RHCL CRDs..."
+
+            # Explicit allowlist of CRDs shipped by this chart
+            RHCL_CRDS="
+              authconfigs.authorino.kuadrant.io
+              authorinos.operator.authorino.kuadrant.io
+              authpolicies.kuadrant.io
+              dnshealthcheckprobes.kuadrant.io
+              dnspolicies.kuadrant.io
+              dnsrecords.kuadrant.io
+              kuadrants.kuadrant.io
+              limitadors.limitador.kuadrant.io
+              oidcpolicies.extensions.kuadrant.io
+              planpolicies.extensions.kuadrant.io
+              ratelimitpolicies.kuadrant.io
+              telemetrypolicies.extensions.kuadrant.io
+              tlspolicies.kuadrant.io
+              tokenratelimitpolicies.kuadrant.io
+            "
+
+            echo "Removing finalizers from RHCL custom resources..."
+            for res in kuadrant authorino limitador authconfig dnsrecord; do
+              kubectl get "$res" --all-namespaces -o name 2>/dev/null | while read -r cr; do
+                kubectl patch "$cr" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+              done
+            done
+
+            echo "Deleting RHCL CRDs (allowlist only)..."
+            for crd in $RHCL_CRDS; do
+              kubectl delete crd "$crd" --ignore-not-found --timeout=30s 2>/dev/null || true
+            done
+
+            echo "RHCL CRD cleanup complete!"

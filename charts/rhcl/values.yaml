@@ -1,0 +1,179 @@
+# Red Hat Connectivity Link (RHCL) Helm Chart
+# Deploys Kuadrant operator stack on OpenShift (ARO on Azure / xKS)
+
+platform:
+  type: kubernetes  # openshift | kubernetes
+
+# Namespaces
+namespaces:
+  operators: kuadrant-operators
+  instances: kuadrant-system
+
+# Gateway namespaces where wasm-plugin-pull-secret must exist.
+# The Envoy proxy in these namespaces needs to pull the WASM shim image.
+# Example: [ingress-gateway, istio-ingress]
+gatewayNamespaces: []
+
+# Image registry and pull secrets
+images:
+  registry: registry.redhat.io
+  pullPolicy: IfNotPresent
+
+  pullSecret:
+    name: redhat-pull-secret
+    create: true
+    # Injected by helmfile from auth.json — do not commit real credentials
+    dockerConfigJson: ""
+
+  # Operator images (digest-pinned for reproducibility)
+  operators:
+    kuadrant:
+      repository: rhcl-1/rhcl-rhel9-operator
+      digest: sha256:1afb2fe0fe38bb0ef02c4b8cb9edb83f7847da47f8ddad766223664dc05ce272
+
+    authorino:
+      repository: rhcl-1/authorino-rhel9-operator
+      digest: sha256:0b60bb9afa31a549d0eac9331f6024e461ab3aed5b1fb2d461dd4db8ddeebeb9
+
+    limitador:
+      repository: rhcl-1/limitador-rhel9-operator
+      digest: sha256:6092c510b04a4cee253a52c07b77b625e90d863fa9ccd8727eb901bd81b4e071
+
+    dns:
+      repository: rhcl-1/dns-rhel9-operator
+      digest: sha256:61e8a471cf20273fe879031eb302a1c7179b5423db4f0a8b9dccefae753ffdf4
+
+  # Component images (deployed by operators via RELATED_IMAGE env vars)
+  components:
+    authorino:
+      repository: rhcl-1/authorino-rhel9
+      digest: sha256:be77901b29529646bbec6baf0d1a7c350be0db291b07a845f353181c25d89f78
+
+    limitador:
+      repository: rhcl-1/limitador-rhel9
+      digest: sha256:aff28d76f9cfeefafd6b652e055bb25e1a2bf250e062e3e9b5e54db873f9eeb7
+
+    wasmshim:
+      repository: rhcl-1/wasm-shim-rhel9
+      digest: sha256:aa524e9278976aa3ef0f2d3aeb981e28d2ea6ed6fc5fede05a5dd33db0bb3de2
+      registry: registry.access.redhat.com
+
+# Operator configurations
+operators:
+  kuadrant:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    env: []
+    podSecurityContext: {}
+    nodeSelector: {}
+    tolerations: []
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: sku
+              operator: NotIn
+              values: ["gpu"]
+
+  authorino:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    env: []
+    podSecurityContext: {}
+    nodeSelector: {}
+    tolerations: []
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: sku
+              operator: NotIn
+              values: ["gpu"]
+
+  limitador:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    env: []
+    podSecurityContext: {}
+    nodeSelector: {}
+    tolerations: []
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: sku
+              operator: NotIn
+              values: ["gpu"]
+
+  dns:
+    enabled: false
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    env: []
+    podSecurityContext: {}
+    nodeSelector: {}
+    tolerations: []
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: sku
+              operator: NotIn
+              values: ["gpu"]
+
+# Kuadrant instance
+instance:
+  kuadrant:
+    enabled: true
+    name: kuadrant
+
+# RBAC
+rbac:
+  create: true
+
+# Monitoring (opt-in)
+monitoring:
+  enabled: false
+
+# Prerequisites validation
+prerequisites:
+  certManager:
+    enabled: true
+  gatewayAPI:
+    enabled: true
+
+# Helmfile auth config
+useSystemPodmanAuth: true
+pullSecretFile: ""
+authFile: ""
