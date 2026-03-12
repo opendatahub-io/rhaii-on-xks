@@ -11,4 +11,5 @@ exclude = [
   "^https?://[0-9]+\\.xx\\.",
   "^hf://",
   "^registry\\.redhat\\.io",
+  "^https://developers\\.redhat\\.com",
 ]
