@@ -39,6 +39,22 @@ helmfiles:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
+  # rhcl (Red Hat Connectivity Link) - optional API gateway, auth, rate limiting
+{{- if hasKey .Values "rhclOperator" }}
+{{- if .Values.rhclOperator.enabled }}
+  - path: charts/rhcl/helmfile.yaml.gotmpl
+    selectorsInherited: true
+    values:
+      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth }}
+      - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
+{{- if and (hasKey .Values.rhclOperator "operators") (hasKey .Values.rhclOperator.operators "dns") }}
+      - operators:
+          dns:
+            enabled: {{ .Values.rhclOperator.operators.dns.enabled | default false }}
+{{- end }}
+{{- end }}
+{{- end }}
+
 ---
 
 {{ $kserveChart := "oci://ghcr.io/opendatahub-io/kserve-rhaii-xks" }}
