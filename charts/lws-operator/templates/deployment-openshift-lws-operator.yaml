@@ -45,4 +45,5 @@ spec:
           type: RuntimeDefault
       serviceAccountName: openshift-lws-operator
       volumes:
-        - name: tmp
+        - emptyDir: {}
+          name: tmp

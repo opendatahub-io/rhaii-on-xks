@@ -202,17 +202,12 @@ charts/sail-operator/
 ## Upgrade Process
 
 ```bash
-# Update to new bundle version
-./scripts/update-bundle.sh 3.3.0 redhat
-
-# Review changes
-git diff
+# (Optional) Update to a new bundle version
+./scripts/update-bundle.sh <version>
 
 # Deploy
-helmfile apply
+make deploy
 ```
-
-The `istiod` SA with `imagePullSecrets` is preserved across upgrades.
 
 ## Gateway API Integration
 
@@ -235,12 +230,3 @@ When users create Gateway resources, Istio automatically:
 
 These pods need pull secrets, hence the manual `copy-pull-secret.sh` step.
 
-## Comparison with cert-manager-operator
-
-| Aspect | cert-manager | sail-operator |
-|--------|--------------|---------------|
-| Operand SAs | Fixed (3 known SAs) | istiod (fixed) + Gateway (dynamic) |
-| SA namespaces | Single (`cert-manager`) | `istio-system` + user namespaces |
-| Pre-create SAs? | Yes (all 3) | Yes (istiod only) |
-| Pull secret approach | Fully automated | istiod: automated, Gateway: manual |
-| OpenShift API stubs | Infrastructure CRD | None needed |
