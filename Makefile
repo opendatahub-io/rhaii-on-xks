@@ -1,6 +1,7 @@
 .PHONY: deploy deploy-all undeploy undeploy-kserve status help check-kubeconfig sync clear-cache
 .PHONY: deploy-cert-manager deploy-istio deploy-lws deploy-kserve deploy-opendatahub-prerequisites deploy-cert-manager-pki
 .PHONY: test conformance
+.PHONY: enable-monitoring disable-monitoring
 
 HELMFILE_CACHE := $(HOME)/.cache/helmfile
 KSERVE_NAMESPACE ?= opendatahub
@@ -19,6 +20,10 @@ help:
 	@echo "Undeploy:"
 	@echo "  make undeploy            - Remove all infrastructure"
 	@echo "  make undeploy-kserve     - Remove KServe"
+	@echo ""
+	@echo "Monitoring (optional):"
+	@echo "  make enable-monitoring   - Enable monitoring in KServe"
+	@echo "  make disable-monitoring  - Disable monitoring in KServe"
 	@echo ""
 	@echo "Other:"
 	@echo "  make status              - Show deployment status"
@@ -178,3 +183,22 @@ test: conformance
 
 conformance: check-kubeconfig
 	@./test/conformance/verify-llm-d-deployment.sh --namespace $(NAMESPACE) --profile $(PROFILE)
+
+# Monitoring
+enable-monitoring: check-kubeconfig
+	@echo "=== Enabling monitoring in KServe ==="
+	@echo "Prerequisites:"
+	@echo "  - Prometheus must be installed (see monitoring-stack/)"
+	@echo "  - ServiceMonitor/PodMonitor CRDs must exist"
+	@kubectl get deployment kserve-controller-manager -n $(KSERVE_NAMESPACE) >/dev/null 2>&1 || \
+		(echo "ERROR: KServe not deployed. Run 'make deploy-kserve' first." && exit 1)
+	kubectl set env deployment/kserve-controller-manager -n $(KSERVE_NAMESPACE) LLMISVC_MONITORING_DISABLED=false
+	@echo ""
+	@echo "Monitoring enabled. KServe will now create PodMonitor resources for vLLM pods."
+
+disable-monitoring: check-kubeconfig
+	@echo "=== Disabling monitoring in KServe ==="
+	@kubectl get deployment kserve-controller-manager -n $(KSERVE_NAMESPACE) >/dev/null 2>&1 || \
+		(echo "ERROR: KServe not deployed." && exit 1)
+	kubectl set env deployment/kserve-controller-manager -n $(KSERVE_NAMESPACE) LLMISVC_MONITORING_DISABLED=true
+	@echo "Monitoring disabled."

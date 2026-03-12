@@ -1,15 +1,12 @@
 # Monitoring on CoreWeave (CKS)
 
-## Prerequisites
+CoreWeave does not have a managed Prometheus service. You must deploy your own.
 
-| Prerequisite | How to Check |
-|--------------|--------------|
-| **Prometheus running** | Self-hosted (no managed option on CoreWeave) |
-| **ServiceMonitor/PodMonitor CRDs** | `kubectl get crd servicemonitors.monitoring.coreos.com` |
+**Prerequisites:** KServe must be deployed first. See the [deployment guide](../../docs/deploying-llm-d-on-managed-kubernetes.md) if not yet completed.
 
-## Install Prometheus (kube-prometheus-stack)
+## 1. Install Prometheus
 
-CoreWeave does not have a managed Prometheus service. Use self-hosted:
+Install kube-prometheus-stack with Helm:
 
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -21,44 +18,59 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false
 ```
 
-CRDs are included automatically.
+This automatically installs:
+- Prometheus server
+- ServiceMonitor/PodMonitor CRDs
+- Grafana
 
-## Verify Prerequisites
+**Verify installation:**
 
 ```bash
-# CRDs exist
-kubectl get crd servicemonitors.monitoring.coreos.com
-kubectl get crd podmonitors.monitoring.coreos.com
+# Check CRDs
+kubectl get crd servicemonitors.monitoring.coreos.com podmonitors.monitoring.coreos.com
 
-# Prometheus is running
-kubectl get pods -n monitoring | grep prometheus
+# Check Prometheus is running
+kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus
 ```
 
-## Enable Monitoring in KServe
+## 2. Enable Monitoring in KServe
 
 By default, monitoring is disabled. Enable it:
 
 ```bash
+# Using make (recommended)
+make enable-monitoring
+
+# Or manually
 kubectl set env deployment/kserve-controller-manager \
   -n opendatahub \
   LLMISVC_MONITORING_DISABLED=false
 ```
 
-KServe automatically creates `PodMonitor` resources for vLLM pods when LLMInferenceService is deployed.
+When enabled, KServe automatically creates `PodMonitor` resources for vLLM pods.
 
-## Verify
+## 3. Verify Monitoring Works
+
+After deploying an LLMInferenceService:
 
 ```bash
-# Check PodMonitors created by KServe
+# Check PodMonitors were created (replace with your namespace, e.g., llm-inference)
 kubectl get podmonitors -n <llmisvc-namespace>
 
-# Check targets in Prometheus
+# Check Prometheus is scraping targets
 kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
-# Open http://localhost:9090/targets
+# Open http://localhost:9090/targets and look for vLLM endpoints
 ```
 
-## Access Grafana
+## 4. Access Dashboards
 
+**Prometheus:**
+```bash
+kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
+```
+Open http://localhost:9090
+
+**Grafana:**
 ```bash
 # Port forward
 kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
@@ -66,5 +78,4 @@ kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 # Get password
 kubectl get secret -n monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d
 ```
-
 Open http://localhost:3000 (user: admin)
