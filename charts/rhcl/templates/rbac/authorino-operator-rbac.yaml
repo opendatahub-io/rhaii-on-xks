@@ -1,0 +1,66 @@
+{{- if and .Values.rbac.create .Values.operators.authorino.enabled }}
+apiVersion: {{ include "rhcl.rbac.apiVersion" . }}
+kind: ClusterRole
+metadata:
+  name: authorino-operator-manager-role
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [events, configmaps, secrets, services, serviceaccounts]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [""]
+    resources: [configmaps/status]
+    verbs: [get, update, patch]
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [apps]
+    resources: [deployments/status]
+    verbs: [get, patch, update]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [authorino.kuadrant.io]
+    resources: [authconfigs]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [authorino.kuadrant.io]
+    resources: [authconfigs/status]
+    verbs: [get, patch, update]
+  - apiGroups: [operator.authorino.kuadrant.io]
+    resources: [authorinos]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [operator.authorino.kuadrant.io]
+    resources: [authorinos/status, authorinos/finalizers]
+    verbs: [get, patch, update]
+  # The operator creates runtime ClusterRoleBindings (authorino, authorino-k8s-auth)
+  # for the Authorino auth server component. Verified on live cluster.
+  # These permissions match the upstream RHCL operator CSV extracted via olm-extractor.
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings, clusterroles, clusterrolebindings]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+  - apiGroups: [authorization.k8s.io]
+    resources: [subjectaccessreviews]
+    verbs: [create]
+---
+apiVersion: {{ include "rhcl.rbac.apiVersion" . }}
+kind: ClusterRoleBinding
+metadata:
+  name: authorino-operator-manager-rolebinding
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: authorino-operator-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: authorino-operator
+    namespace: {{ .Values.namespaces.operators }}
+{{- end }}

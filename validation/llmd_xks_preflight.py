@@ -122,6 +122,51 @@ class LLMDXKSChecks:
                         "result": False,
                     },
                 ]
+            },
+            "rhcl": {
+                "description": "RHCL (Red Hat Connectivity Link) readiness tests",
+                "tests": [
+                    {
+                        "name": "crd_kuadrant",
+                        "function": self.test_crd_kuadrant,
+                        "description": "test if the cluster has the Kuadrant CRDs",
+                        "suggested_action": "install RHCL: cd charts/rhcl && helmfile apply",
+                        "result": False,
+                        "optional": True
+                    },
+                    {
+                        "name": "operator_kuadrant",
+                        "function": self.test_operator_kuadrant,
+                        "description": "test if the Kuadrant operator is running properly",
+                        "suggested_action": "install or verify RHCL deployment",
+                        "result": False,
+                        "optional": True
+                    },
+                    {
+                        "name": "operator_authorino",
+                        "function": self.test_operator_authorino,
+                        "description": "test if the Authorino operator is running properly",
+                        "suggested_action": "install or verify RHCL deployment",
+                        "result": False,
+                        "optional": True
+                    },
+                    {
+                        "name": "operator_limitador",
+                        "function": self.test_operator_limitador,
+                        "description": "test if the Limitador operator is running properly",
+                        "suggested_action": "install or verify RHCL deployment",
+                        "result": False,
+                        "optional": True
+                    },
+                    {
+                        "name": "instance_kuadrant",
+                        "function": self.test_instance_kuadrant,
+                        "description": "test if the Kuadrant instance is ready",
+                        "suggested_action": "verify Kuadrant CR: kubectl get kuadrant -n kuadrant-system",
+                        "result": False,
+                        "optional": True
+                    },
+                ]
             }
         }
 
@@ -269,6 +314,49 @@ class LLMDXKSChecks:
         if not self._deployment_ready("opendatahub", "kserve-controller-manager"):
             test_failed = True
         return not test_failed
+
+    def test_crd_kuadrant(self):
+        required_crds = [
+            "kuadrants.kuadrant.io",
+            "authpolicies.kuadrant.io",
+            "ratelimitpolicies.kuadrant.io",
+            "tlspolicies.kuadrant.io",
+            "authconfigs.authorino.kuadrant.io",
+            "limitadors.limitador.kuadrant.io",
+        ]
+        if self._test_crds_present(required_crds):
+            self.logger.info("All required Kuadrant/RHCL CRDs are present")
+            return True
+        else:
+            self.logger.warning("Missing Kuadrant/RHCL CRDs")
+            return False
+
+    def test_operator_kuadrant(self):
+        return self._deployment_ready("kuadrant-operators", "kuadrant-operator-controller-manager")
+
+    def test_operator_authorino(self):
+        return self._deployment_ready("kuadrant-operators", "authorino-operator")
+
+    def test_operator_limitador(self):
+        return self._deployment_ready("kuadrant-operators", "limitador-operator-controller-manager")
+
+    def test_instance_kuadrant(self):
+        try:
+            api = kubernetes.client.CustomObjectsApi()
+            kuadrant = api.get_namespaced_custom_object(
+                group="kuadrant.io", version="v1beta1",
+                namespace="kuadrant-system", plural="kuadrants", name="kuadrant"
+            )
+            conditions = kuadrant.get("status", {}).get("conditions", [])
+            for c in conditions:
+                if c.get("type") == "Ready" and c.get("status") == "True":
+                    self.logger.info("Kuadrant instance is Ready")
+                    return True
+            self.logger.warning("Kuadrant instance exists but is not Ready")
+            return False
+        except Exception as e:
+            self.logger.warning(f"Kuadrant instance not found: {e}")
+            return False
 
     def test_gpu_availability(self):
         def nvidia_driver_present(node):
@@ -476,7 +564,7 @@ def cli_arguments():
 
     parser.add_argument(
         "-s", "--suite",
-        choices=["all", "cluster", "operators"],
+        choices=["all", "cluster", "operators", "rhcl"],
         default="all",
         env_var="LLMD_XKS_SUITE",
         help="Test suite to execute"
