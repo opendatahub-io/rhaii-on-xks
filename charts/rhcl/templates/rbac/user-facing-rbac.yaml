@@ -1,0 +1,30 @@
+{{- if and .Values.rbac.create .Values.operators.authorino.enabled }}
+# Convenience roles for teams that need to manage AuthConfig resources
+apiVersion: {{ include "rhcl.rbac.apiVersion" . }}
+kind: ClusterRole
+metadata:
+  name: authorino-authconfig-editor-role
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [authorino.kuadrant.io]
+    resources: [authconfigs]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [authorino.kuadrant.io]
+    resources: [authconfigs/status]
+    verbs: [get]
+---
+apiVersion: {{ include "rhcl.rbac.apiVersion" . }}
+kind: ClusterRole
+metadata:
+  name: authorino-authconfig-viewer-role
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [authorino.kuadrant.io]
+    resources: [authconfigs]
+    verbs: [get, list, watch]
+  - apiGroups: [authorino.kuadrant.io]
+    resources: [authconfigs/status]
+    verbs: [get]
+{{- end }}

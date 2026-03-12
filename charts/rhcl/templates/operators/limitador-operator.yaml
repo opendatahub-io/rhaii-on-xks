@@ -1,0 +1,75 @@
+{{- if .Values.operators.limitador.enabled }}
+apiVersion: {{ include "rhcl.deployment.apiVersion" . }}
+kind: Deployment
+metadata:
+  name: limitador-operator-controller-manager
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: limitador-operator
+    control-plane: controller-manager
+spec:
+  replicas: {{ .Values.operators.limitador.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/component: limitador-operator
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+        app.kubernetes.io/component: limitador-operator
+    spec:
+      serviceAccountName: limitador-operator-controller-manager
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        {{- $defaults := dict "runAsNonRoot" true "seccompProfile" (dict "type" "RuntimeDefault") }}
+        {{- toYaml (mergeOverwrite $defaults (.Values.operators.limitador.podSecurityContext | default dict)) | nindent 8 }}
+      containers:
+        - name: manager
+          image: {{ include "rhcl.image" (dict "registry" .Values.images.registry "repository" .Values.images.operators.limitador.repository "digest" .Values.images.operators.limitador.digest) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - name: RELATED_IMAGE_LIMITADOR
+              value: {{ include "rhcl.image" (dict "registry" .Values.images.registry "repository" .Values.images.components.limitador.repository "digest" .Values.images.components.limitador.digest) }}
+            {{- if .Values.operators.limitador.env }}
+            {{- toYaml .Values.operators.limitador.env | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.operators.limitador.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+      {{- with .Values.operators.limitador.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operators.limitador.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operators.limitador.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

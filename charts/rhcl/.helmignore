@@ -1,0 +1,10 @@
+.git
+.gitignore
+*.md
+scripts/
+test/
+manifests-presync/
+manifests-postsync/
+helmfile.yaml.gotmpl
+Makefile
+.DS_Store

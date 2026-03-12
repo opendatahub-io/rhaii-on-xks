@@ -1,0 +1,58 @@
+{{- if .Values.monitoring.enabled }}
+{{- if .Values.operators.kuadrant.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kuadrant-operator-metrics
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kuadrant-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: kuadrant-operator
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+{{- end }}
+---
+{{- if .Values.operators.authorino.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: authorino-operator-metrics
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: authorino-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: authorino-operator
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+{{- end }}
+---
+{{- if .Values.operators.limitador.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: limitador-operator-metrics
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: limitador-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: limitador-operator
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+{{- end }}
+{{- end }}
