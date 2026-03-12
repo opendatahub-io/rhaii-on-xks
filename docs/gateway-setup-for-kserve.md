@@ -38,19 +38,7 @@ GATEWAY_NAME=inference-gateway \
 
 ## Manual Setup
 
-### Step 1: Copy Pull Secret
-
-The Gateway pod needs to pull Istio images from `registry.redhat.io`:
-
-```bash
-# Copy pull secret to opendatahub namespace
-kubectl delete secret redhat-pull-secret -n opendatahub --ignore-not-found
-kubectl get secret redhat-pull-secret -n istio-system -o json | \
-  jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations, .metadata.labels) | .metadata.namespace = "opendatahub"' | \
-  kubectl create -f -
-```
-
-### Step 2: Extract CA and Create ConfigMap
+### Step 1: Extract CA and Create ConfigMap
 
 ```bash
 # Extract CA certificate from cert-manager secret
@@ -71,7 +59,7 @@ kubectl create configmap odh-ca-bundle \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-### Step 3: Create Gateway Configuration ConfigMap
+### Step 2: Create Gateway Configuration ConfigMap
 
 This configures the Gateway pod to mount the CA bundle at the path expected by
 LLM workloads (`/var/run/secrets/opendatahub/ca.crt`).
@@ -101,7 +89,7 @@ data:
 EOF
 ```
 
-### Step 4: Create the Gateway
+### Step 3: Create the Gateway
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -129,7 +117,7 @@ spec:
 EOF
 ```
 
-### Step 5: Patch ServiceAccount and Restart Pod
+### Step 4: Patch ServiceAccount and Restart Pod
 
 The Gateway ServiceAccount needs the pull secret to pull Istio images:
 
@@ -147,7 +135,7 @@ kubectl wait --for=condition=Ready pod \
   -n opendatahub --timeout=120s
 ```
 
-### Step 6: Verify
+### Step 5: Verify
 
 ```bash
 # Check Gateway is programmed

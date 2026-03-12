@@ -1,1 +1,58 @@
-{{ .Files.Get "files/resources.yaml" }}
+{{- $resourcesFile := .Files.Get "files/resources.yaml" }}
+{{- $pullSecretEmitted := dict }}
+{{- range $doc := regexSplit "(?m)^---$" $resourcesFile -1 }}
+{{- $resource := fromYaml $doc }}
+{{- if and $resource $resource.kind }}
+{{- if eq $resource.kind "ServiceAccount" }}
+{{- $ns := $resource.metadata.namespace }}
+{{- if and $.Values.pullSecret.dockerConfigJson (not (hasKey $pullSecretEmitted $ns)) }}
+{{- $_ := set $pullSecretEmitted $ns true }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redhat-pull-secret
+  namespace: {{ $ns }}
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: {{ $.Values.pullSecret.dockerConfigJson | b64enc }}
+{{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  {{- with $resource.metadata.labels }}
+  labels:
+    {{- range $key, $value := . }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+  {{- end }}
+  {{- with $resource.metadata.annotations }}
+  annotations:
+    {{- range $key, $value := . }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+  {{- end }}
+  name: {{ $resource.metadata.name }}
+  namespace: {{ $ns }}
+{{- if hasKey $resource "automountServiceAccountToken" }}
+automountServiceAccountToken: {{ $resource.automountServiceAccountToken }}
+{{- end }}
+{{- if $.Values.pullSecret.dockerConfigJson }}
+imagePullSecrets:
+  - name: redhat-pull-secret
+  {{- range $resource.imagePullSecrets }}
+  - name: {{ .name }}
+  {{- end }}
+{{- else if $resource.imagePullSecrets }}
+imagePullSecrets:
+  {{- range $resource.imagePullSecrets }}
+  - name: {{ .name }}
+  {{- end }}
+{{- end }}
+{{- else }}
+---
+{{ $doc }}
+{{- end }}
+{{- end }}
+{{- end }}
