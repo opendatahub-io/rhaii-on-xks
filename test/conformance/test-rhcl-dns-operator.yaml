@@ -1,0 +1,33 @@
+# Test resources for DNS operator validation
+# Dry-run only — does not require cloud DNS credentials
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rhcl-test-dns
+  labels:
+    app.kubernetes.io/part-of: rhcl-test-dns
+---
+apiVersion: kuadrant.io/v1
+kind: DNSPolicy
+metadata:
+  name: test-dns-policy
+  namespace: rhcl-test-dns
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: test-gateway
+---
+apiVersion: kuadrant.io/v1alpha1
+kind: DNSRecord
+metadata:
+  name: test-dns-record
+  namespace: rhcl-test-dns
+spec:
+  endpoints:
+    - dnsName: test.example.com
+      recordTTL: 300
+      recordType: A
+      targets:
+        - 1.2.3.4
