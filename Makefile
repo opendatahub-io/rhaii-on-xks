@@ -57,9 +57,6 @@ deploy-lws: check-kubeconfig clear-cache
 deploy-opendatahub-prerequisites: check-kubeconfig
 	@echo "=== Deploying OpenDataHub prerequisites ==="
 	kubectl create namespace $(KSERVE_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
-	-kubectl get secret redhat-pull-secret -n istio-system -o yaml 2>/dev/null | \
-		sed 's/namespace: istio-system/namespace: $(KSERVE_NAMESPACE)/' | \
-		kubectl apply -f - 2>/dev/null || true
 
 deploy-cert-manager-pki: check-kubeconfig deploy-opendatahub-prerequisites
 	@kubectl get crd clusterissuers.cert-manager.io >/dev/null 2>&1 || \
