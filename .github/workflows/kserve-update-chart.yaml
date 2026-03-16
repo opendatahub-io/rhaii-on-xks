@@ -13,11 +13,11 @@ on:
       kserve_ref:
         description: 'KServe branch/tag to use'
         required: false
-        default: 'rhoai-3.4'
+        default: 'rhoai-3.4-ea.1'
       rhoai_branch:
         description: 'RHOAI-Build-Config branch for images'
         required: false
-        default: 'rhoai-3.4'
+        default: 'rhoai-3.4-ea.1'
       image_tag:
         description: 'Image tag for quay.io replacements'
         required: false
