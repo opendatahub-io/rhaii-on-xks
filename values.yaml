@@ -23,6 +23,8 @@ certManager:
 # sail-operator / Istio (required for gateway)
 sailOperator:
   enabled: true
+  # Gateway API CRD installation - set to false on OpenShift (managed by Ingress Operator)
+  installGatewayAPICRDs: false  # false for OpenShift, true for non-OpenShift
 
 # lws-operator (optional - for multi-node workloads)
 lwsOperator:

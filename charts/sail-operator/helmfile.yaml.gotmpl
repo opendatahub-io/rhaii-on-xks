@@ -27,6 +27,8 @@ releases:
         value: {{ .Values.bundle.source }}
       - name: bundle.version
         value: {{ .Values.bundle.version }}
+      - name: gatewayAPI.installCRDs
+        value: {{- if hasKey .Values.gatewayAPI "installCRDs" }} {{ .Values.gatewayAPI.installCRDs }}{{- else }} true{{- end }}
 {{- if .Values.useSystemPodmanAuth }}
       - name: pullSecret.dockerConfigJson
         file: {{ env "HOME" }}/.config/containers/auth.json
@@ -43,14 +45,18 @@ releases:
         showlogs: true
         command: "kubectl"
         args: ["apply", "-f", "manifests-presync/"]
+{{- if .Values.gatewayAPI.installCRDs }}
       # Apply Gateway API CRDs (required - not included in KServe)
+      # Skip on OpenShift (managed by Ingress Operator)
       - events: ["presync"]
         showlogs: true
         command: "kubectl"
         args: ["apply", "-k", "https://github.com/kubernetes-sigs/gateway-api/config/crd?ref={{ .Values.gatewayAPI.version }}"]
-{{- if .Values.gatewayAPI.inferenceExtension.enabled }}
+{{- end }}
+{{- if and .Values.gatewayAPI.installCRDs .Values.gatewayAPI.inferenceExtension.enabled }}
       # Apply Gateway API Inference Extension CRDs
       # Skip if using KServe (KServe installs these via config/llmisvc)
+      # Skip on OpenShift (Gateway API CRDs are managed by Ingress Operator)
       - events: ["presync"]
         showlogs: true
         command: "kubectl"

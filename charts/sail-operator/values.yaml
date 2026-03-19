@@ -16,9 +16,13 @@ pullSecret:
   name: redhat-pull-secret
   dockerConfigJson: ""  # Set automatically by helmfile from root auth config
 
-# Gateway API CRD versions (applied via presync hooks)
+# Gateway API CRD installation and versions
 gatewayAPI:
-  # Kubernetes Gateway API (Gateway, HTTPRoute, etc.)
+  # Install Kubernetes Gateway API version (Gateway, HTTPRoute, etc.) via presync hook
+  # - On OpenShift: set to false (CRDs are already managed by Ingress Operator)
+  # - On non-OpenShift (AKS, CoreWeave): set to true (installs from kubernetes-sigs/gateway-api)
+  # Default: true (if not set)
+  installCRDs: true
   # Required - not included in KServe kustomize
   version: "v1.4.0"
   # Gateway API Inference Extension (InferencePool, InferenceModel, etc.)

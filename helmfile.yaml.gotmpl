@@ -32,6 +32,8 @@ helmfiles:
     values:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
+      - gatewayAPI:
+          installCRDs: {{- if hasKey .Values.sailOperator "installGatewayAPICRDs" }} {{ .Values.sailOperator.installGatewayAPICRDs }}{{- else }} true{{- end }}
 
   # lws-operator
   - path: charts/lws-operator/helmfile.yaml.gotmpl

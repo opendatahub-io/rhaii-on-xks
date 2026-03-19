@@ -84,6 +84,24 @@ gatewayAPI:
 
 > **Note:** Gateway API CRDs are still installed by the sail-operator chart since KServe doesn't include them in its kustomize configuration.
 
+### OpenShift Clusters
+
+On OpenShift, Gateway API CRDs are already installed and managed by the OpenShift Ingress Operator. Set `installCRDs: false` to skip installing them:
+
+```yaml
+# values.yaml or root helmfile
+sailOperator:
+  installGatewayAPICRDs: false
+```
+
+Without this, deployment will fail with:
+```
+customresourcedefinitions.apiextensions.k8s.io "referencegrants.gateway.networking.k8s.io" is forbidden:
+ValidatingAdmissionPolicy 'openshift-ingress-operator-gatewayapi-crd-admission' with binding
+'openshift-ingress-operator-gatewayapi-crd-admission' denied request: Gateway API Custom Resource
+Definitions are managed by the Ingress Operator and may not be modified
+```
+
 ### Values
 
 | Parameter | Description | Default |
@@ -94,6 +112,7 @@ gatewayAPI:
 | `istioVersion` | Istio version to deploy | `v1.27-latest` |
 | `pullSecret.name` | Pull secret name | `redhat-pull-secret` |
 | `pullSecret.dockerConfigJson` | Docker config (set by helmfile) | `""` |
+| `gatewayAPI.installCRDs` | Install Gateway API CRDs (set to `false` on OpenShift) | `true` |
 | `gatewayAPI.version` | Gateway API CRD version | `v1.4.0` |
 | `gatewayAPI.inferenceExtension.enabled` | Install Inference Extension CRDs | `true` |
 | `gatewayAPI.inferenceExtension.version` | Inference Extension CRD version | `v1.2.0` |
