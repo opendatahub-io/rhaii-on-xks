@@ -1,0 +1,62 @@
+# RHCL Development Configuration
+# Minimal resources, single replica, no monitoring, no DNS operator
+
+platform:
+  type: openshift
+
+namespaces:
+  operators: kuadrant-operators
+  instances: kuadrant-system
+
+gatewayNamespaces: []
+
+operators:
+  kuadrant:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    affinity: {}
+
+  authorino:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    affinity: {}
+
+  limitador:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    affinity: {}
+
+  dns:
+    enabled: false
+
+instance:
+  kuadrant:
+    enabled: true
+    name: kuadrant
+
+rbac:
+  create: true
+
+monitoring:
+  enabled: false

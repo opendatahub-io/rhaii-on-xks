@@ -1,0 +1,50 @@
+{{- if .Values.operators.kuadrant.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kuadrant-operator-pdb
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kuadrant-operator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/component: kuadrant-operator
+{{- end }}
+---
+{{- if .Values.operators.authorino.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: authorino-operator-pdb
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: authorino-operator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/component: authorino-operator
+{{- end }}
+---
+{{- if .Values.operators.limitador.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: limitador-operator-pdb
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: limitador-operator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/component: limitador-operator
+{{- end }}

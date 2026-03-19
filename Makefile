@@ -1,9 +1,10 @@
 .PHONY: deploy deploy-all undeploy undeploy-kserve status help check-kubeconfig sync clear-cache
-.PHONY: deploy-cert-manager deploy-istio deploy-lws deploy-kserve deploy-opendatahub-prerequisites deploy-cert-manager-pki
-.PHONY: test conformance
+.PHONY: deploy-cert-manager deploy-istio deploy-lws deploy-rhcl deploy-kserve deploy-opendatahub-prerequisites deploy-cert-manager-pki
+.PHONY: undeploy-rhcl test conformance
 
 HELMFILE_CACHE := $(HOME)/.cache/helmfile
 KSERVE_NAMESPACE ?= opendatahub
+RHCL ?= false
 
 check-kubeconfig:
 	@kubectl cluster-info >/dev/null 2>&1 || (echo "ERROR: Cannot connect to cluster. Check KUBECONFIG." && exit 1)
@@ -14,10 +15,13 @@ help:
 	@echo "Deploy:"
 	@echo "  make deploy              - Deploy cert-manager + istio + lws"
 	@echo "  make deploy-all          - Deploy all (cert-manager + istio + lws + kserve)"
+	@echo "  make deploy-all RHCL=true - Deploy all including RHCL"
+	@echo "  make deploy-rhcl         - Deploy RHCL standalone (API gateway, auth, rate limiting)"
 	@echo "  make deploy-kserve       - Deploy KServe"
 	@echo ""
 	@echo "Undeploy:"
 	@echo "  make undeploy            - Remove all infrastructure"
+	@echo "  make undeploy-rhcl       - Remove RHCL"
 	@echo "  make undeploy-kserve     - Remove KServe"
 	@echo ""
 	@echo "Other:"
@@ -42,7 +46,9 @@ deploy: check-kubeconfig clear-cache
 	helmfile apply --selector name=lws-operator
 	@$(MAKE) status
 
-deploy-all: check-kubeconfig deploy-cert-manager deploy-istio deploy-lws deploy-kserve
+RHCL_TARGET := $(if $(filter true,$(RHCL)),deploy-rhcl,)
+
+deploy-all: check-kubeconfig deploy-cert-manager deploy-istio deploy-lws $(RHCL_TARGET) deploy-kserve
 	@$(MAKE) status
 
 deploy-cert-manager: check-kubeconfig clear-cache
@@ -53,6 +59,21 @@ deploy-istio: check-kubeconfig clear-cache
 
 deploy-lws: check-kubeconfig clear-cache
 	helmfile apply --selector name=lws-operator
+
+deploy-rhcl: check-kubeconfig clear-cache
+	@echo "=== Deploying RHCL (Red Hat Connectivity Link) ==="
+	@echo "Prerequisites: cert-manager and sail-operator must be deployed first"
+	@kubectl get crd certificaterequests.cert-manager.io >/dev/null 2>&1 || \
+		(echo "ERROR: cert-manager not found. Run 'make deploy-cert-manager' first." && exit 1)
+	@kubectl get crd gateways.gateway.networking.k8s.io >/dev/null 2>&1 || \
+		(echo "ERROR: Gateway API CRDs not found. Run 'make deploy-istio' first." && exit 1)
+	helmfile apply --selector name=rhcl --state-values-set rhclOperator.enabled=true
+	@echo "=== RHCL deployed ==="
+
+undeploy-rhcl: check-kubeconfig
+	@echo "=== Removing RHCL ==="
+	-helmfile destroy --selector name=rhcl --state-values-set rhclOperator.enabled=true
+	@echo "=== RHCL removed ==="
 
 deploy-opendatahub-prerequisites: check-kubeconfig
 	@echo "=== Deploying OpenDataHub prerequisites ==="
@@ -122,6 +143,14 @@ status: check-kubeconfig
 	@echo ""
 	@echo "lws-operator:"
 	@kubectl get pods -n openshift-lws-operator 2>/dev/null || echo "  Not deployed"
+	@echo ""
+	@echo "rhcl (optional):"
+	@kubectl get pods -n kuadrant-operators 2>/dev/null || echo "  Not deployed (optional component)"
+	@if kubectl get namespace kuadrant-system >/dev/null 2>&1; then \
+		echo ""; \
+		echo "rhcl instances:"; \
+		kubectl get kuadrant,authorino,limitador -n kuadrant-system 2>/dev/null || echo "  No instances"; \
+	fi
 	@echo ""
 	@echo "kserve:"
 	@kubectl get pods -n $(KSERVE_NAMESPACE) -l control-plane=kserve-controller-manager 2>/dev/null || echo "  Not deployed"

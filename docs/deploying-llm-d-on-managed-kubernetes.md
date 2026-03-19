@@ -30,9 +30,10 @@ This guide provides step-by-step instructions for deploying Distributed Inferenc
 5. [Deploying an LLM Inference Service](#5-deploying-an-llm-inference-service)
 6. [Verifying the Deployment](#6-verifying-the-deployment)
 7. [Optional: Enabling Monitoring](#7-optional-enabling-monitoring)
-8. [Collecting Debug Information](#8-collecting-debug-information)
-9. [Troubleshooting](#9-troubleshooting)
-10. [Appendix: Component Versions](#appendix-component-versions)
+8. [Optional: Enabling RHCL (API Gateway, Auth, Rate Limiting)](#8-optional-enabling-rhcl-api-gateway-auth-rate-limiting)
+9. [Collecting Debug Information](#9-collecting-debug-information)
+10. [Troubleshooting](#10-troubleshooting)
+11. [Appendix: Component Versions](#appendix-component-versions)
 
 ---
 
@@ -470,7 +471,121 @@ kubectl get podmonitors -n <llmisvc-namespace>
 
 ---
 
-## 8. Collecting Debug Information
+## 8. Optional: Enabling RHCL (API Gateway, Auth, Rate Limiting)
+
+Red Hat Connectivity Link (RHCL) provides API gateway authentication, authorization, and rate limiting for inference endpoints. It deploys the Kuadrant operator stack (Kuadrant, Authorino, Limitador) and is **disabled by default**.
+
+### 8.1 Enable RHCL
+
+Edit `values.yaml` to enable:
+
+```yaml
+rhclOperator:
+  enabled: true
+  operators:
+    dns:
+      enabled: false  # Set to true if you need DNS policy management
+```
+
+### 8.2 Deploy
+
+Deploy RHCL after the baseline stack is running:
+
+```bash
+cd charts/rhcl && helmfile apply
+```
+
+This will:
+1. Create namespaces (`kuadrant-operators`, `kuadrant-system`)
+2. Deploy 3 operators (Kuadrant, Authorino, Limitador)
+3. Install 14 CRDs
+4. Create a Kuadrant instance and wait for it to be ready
+
+> **Note:** RHCL requires cert-manager and Istio (sail-operator) to be deployed first. Run `make deploy-all` before enabling RHCL.
+
+> **Note:** When deploying standalone via `cd charts/rhcl && helmfile apply`, the chart reads its own `charts/rhcl/values.yaml` directly. The root `values.yaml` `rhclOperator` settings only apply when deploying via the root helmfile (`helmfile apply` from the repo root).
+
+### 8.3 Verify
+
+```bash
+# Check operators
+kubectl get pods -n kuadrant-operators
+
+# Check Kuadrant instance
+kubectl get kuadrant -n kuadrant-system
+
+# Check sub-operator instances
+kubectl get authorino,limitador -n kuadrant-system
+```
+
+All operators should show `1/1 Running` and the Kuadrant CR should show `Ready`.
+
+### 8.4 Creating Policies
+
+After RHCL is deployed, you can create policies targeting your Gateways and HTTPRoutes:
+
+**AuthPolicy** (API key authentication on an HTTPRoute):
+```yaml
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: my-auth
+  namespace: my-app
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: my-route
+  rules:
+    authentication:
+      api-key-auth:
+        apiKey:
+          selector: {}
+        credentials:
+          queryString:
+            name: apikey
+```
+
+**RateLimitPolicy** (rate limiting on a Gateway):
+```yaml
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: my-ratelimit
+  namespace: my-gateway-ns
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: my-gateway
+  limits:
+    default-limits:
+      rates:
+        - limit: 10
+          window: 10s
+```
+
+### 8.5 Running Integration Tests
+
+```bash
+./test/conformance/verify-rhcl-deployment.sh
+```
+
+This deploys a test Gateway, HTTPRoute, AuthPolicy, and RateLimitPolicy, validates enforcement, and cleans up.
+
+### 8.6 Disabling RHCL
+
+Set `rhclOperator.enabled: false` in `values.yaml`, or uninstall:
+
+```bash
+cd charts/rhcl && helmfile destroy
+```
+
+For detailed configuration, see [charts/rhcl/README.md](../charts/rhcl/README.md).
+
+---
+
+## 9. Collecting Debug Information
 
 If you encounter issues during or after deployment, collect diagnostic data for troubleshooting:
 
@@ -499,9 +614,9 @@ See the full guide: [Collecting Debug Information](./collecting-debug-informatio
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
-### 9.1 Controller Pod Stuck in ContainerCreating
+### 10.1 Controller Pod Stuck in ContainerCreating
 
 **Symptom:** The `kserve-controller-manager` pod remains in `ContainerCreating` state.
 
@@ -519,7 +634,7 @@ kubectl get certificate -n cert-manager
 make deploy-kserve
 ```
 
-### 9.2 Gateway Pod Shows ErrImagePull
+### 10.2 Gateway Pod Shows ErrImagePull
 
 **Symptom:** The Gateway pod fails with `ErrImagePull` or `ImagePullBackOff`.
 
@@ -538,7 +653,7 @@ kubectl patch sa inference-gateway-istio -n opendatahub \
 kubectl delete pod -n opendatahub -l gateway.networking.k8s.io/gateway-name=inference-gateway
 ```
 
-### 9.3 LLMInferenceService Pod Shows FailedScheduling
+### 10.3 LLMInferenceService Pod Shows FailedScheduling
 
 **Symptom:** The inference pod shows `FailedScheduling` with message "Insufficient nvidia.com/gpu".
 
@@ -558,7 +673,7 @@ kubectl delete pod -n opendatahub -l gateway.networking.k8s.io/gateway-name=infe
 
 3. Add matching tolerations to the LLMInferenceService spec (see Section 5.3).
 
-### 9.4 Webhook Validation Errors During Deployment
+### 10.4 Webhook Validation Errors During Deployment
 
 **Symptom:** Deployment fails with "no endpoints available for service" webhook errors.
 
