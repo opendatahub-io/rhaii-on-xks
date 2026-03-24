@@ -1,9 +1,10 @@
 .PHONY: deploy deploy-all undeploy undeploy-kserve status help check-kubeconfig sync clear-cache
 .PHONY: deploy-cert-manager deploy-istio deploy-lws deploy-kserve deploy-opendatahub-prerequisites deploy-cert-manager-pki
-.PHONY: test conformance
+.PHONY: test conformance deploy-mock-model clean-mock-model
 
 HELMFILE_CACHE := $(HOME)/.cache/helmfile
-KSERVE_NAMESPACE ?= opendatahub
+# Auto-detect KServe namespace: redhat-ods-applications (EA2) or opendatahub (EA1)
+KSERVE_NAMESPACE ?= $(shell kubectl get deployment llmisvc-controller-manager -n redhat-ods-applications -o name 2>/dev/null | grep -q . && echo redhat-ods-applications || echo opendatahub)
 
 check-kubeconfig:
 	@kubectl cluster-info >/dev/null 2>&1 || (echo "ERROR: Cannot connect to cluster. Check KUBECONFIG." && exit 1)
@@ -171,10 +172,23 @@ status: check-kubeconfig
 	@echo ""
 
 # Test/Conformance (ODH deployment validation)
-NAMESPACE ?= llm-d
+NAMESPACE ?= llm-inference
 PROFILE ?= kserve-basic
 
 test: conformance
 
 conformance: check-kubeconfig
-	@./test/conformance/verify-llm-d-deployment.sh --namespace $(NAMESPACE) --profile $(PROFILE)
+	@./test/conformance/verify-llm-d-deployment.sh --kserve --kserve-namespace $(KSERVE_NAMESPACE) --namespace $(NAMESPACE) --profile $(PROFILE)
+
+# Deploy/clean mock vLLM model (no GPU required)
+MOCK_NAMESPACE := mock-vllm-test
+
+deploy-mock-model: check-kubeconfig
+	@./test/deploy-model.sh
+
+clean-mock-model: check-kubeconfig
+	@echo "=== Cleaning up mock model deployment ==="
+	-kubectl delete llmisvc --all -n "$(MOCK_NAMESPACE)" --ignore-not-found
+	-kubectl delete clusterstoragecontainer local-noop --ignore-not-found 2>/dev/null || true
+	-kubectl delete namespace "$(MOCK_NAMESPACE)" --ignore-not-found
+	@echo "=== Done ==="

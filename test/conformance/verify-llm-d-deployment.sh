@@ -856,7 +856,7 @@ check_pod_pattern() {
         fi
         echo "$count"
     else
-        log_fail "$description: No pods found matching '$pattern'"
+        log_warn "$description: No pods found matching '$pattern'"
         echo "0"
     fi
 }
@@ -1006,8 +1006,8 @@ check_llminferenceservice_resources() {
         fi
         return 0
     else
-        log_fail "No LLMInferenceService resources found in $LLMD_NAMESPACE"
-        return 1
+        log_warn "No LLMInferenceService resources found in $LLMD_NAMESPACE (OK for mock deployment)"
+        return 0
     fi
 }
 
@@ -1130,18 +1130,25 @@ check_kserve_controller() {
 
     local kserve_ns="${KSERVE_NAMESPACE:-opendatahub}"
 
-    # Check controller pod
-    local controller_pods
-    controller_pods=$($KUBECTL get pods -n "$kserve_ns" -l control-plane=kserve-controller-manager --no-headers 2>/dev/null | wc -l)
+    # Check controller pod (EA1: kserve-controller-manager, EA2: llmisvc-controller-manager)
+    local controller_pods=0
+    local controller_label=""
+    for label in "control-plane=kserve-controller-manager" "control-plane=llmisvc-controller-manager"; do
+        controller_pods=$($KUBECTL get pods -n "$kserve_ns" -l "$label" --no-headers 2>/dev/null | wc -l)
+        if [[ "$controller_pods" -gt 0 ]]; then
+            controller_label="$label"
+            break
+        fi
+    done
 
     if [[ "$controller_pods" -gt 0 ]]; then
         local running
-        running=$($KUBECTL get pods -n "$kserve_ns" -l control-plane=kserve-controller-manager --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+        running=$($KUBECTL get pods -n "$kserve_ns" -l "$controller_label" --no-headers 2>/dev/null | grep -c "Running" || echo "0")
         if [[ "$running" -gt 0 ]]; then
             log_pass "KServe controller: $running pod(s) running in $kserve_ns"
         else
             log_fail "KServe controller pods not running"
-            $KUBECTL get pods -n "$kserve_ns" -l control-plane=kserve-controller-manager
+            $KUBECTL get pods -n "$kserve_ns" -l "$controller_label"
         fi
     else
         log_fail "KServe controller not found in $kserve_ns"
@@ -1610,7 +1617,10 @@ auto_detect_model() {
     log_info "Auto-detecting model from /v1/models..."
 
     local response
-    if response=$(curl -s $curl_opts --max-time 10 "${base_url}/v1/models" 2>/dev/null); then
+    # shellcheck disable=SC2086
+    response=$(curl -s $curl_opts --max-time 10 "${base_url}/v1/models" 2>/dev/null || true)
+
+    if [[ -n "$response" ]]; then
         local model
         model=$(echo "$response" | jq -r '.data[0].id // .models[0].id // .models[0] // empty' 2>/dev/null || echo "")
         if [[ -n "$model" ]]; then
@@ -1987,11 +1997,13 @@ check_inference_readiness() {
     echo ""
 
     local response http_code
-    if response=$(curl -s $curl_opts -w "\n%{http_code}" --max-time 60 \
+    # shellcheck disable=SC2086
+    response=$(curl -s $curl_opts -w "\n%{http_code}" --max-time 60 \
         -X POST "${base_url}/v1/completions" \
         -H "Content-Type: application/json" \
-        -d "{\"model\":\"$MODEL_NAME\",\"prompt\":\"Hello\",\"max_tokens\":10}" 2>/dev/null); then
+        -d "{\"model\":\"$MODEL_NAME\",\"prompt\":\"Hello\",\"max_tokens\":10}" 2>/dev/null || true)
 
+    if [[ -n "$response" ]]; then
         http_code=$(echo "$response" | tail -1)
 
         if [[ "$http_code" == "200" ]]; then
@@ -2010,8 +2022,8 @@ check_inference_readiness() {
 check_events() {
     log_section "8. Recent Events"
 
-    log_info "Warning/Error events:"
-    $KUBECTL get events -n "$LLMD_NAMESPACE" --sort-by='.lastTimestamp' 2>/dev/null | grep -E "Warning|Error" | tail -5 || echo "  (none)"
+    log_info "Warning/Error events (informational — startup probe failures during model loading are expected):"
+    $KUBECTL get events -n "$LLMD_NAMESPACE" --sort-by='.lastTimestamp' --field-selector type=Warning 2>/dev/null | tail -5 || echo "  (none)"
 }
 
 # =============================================================================

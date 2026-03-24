@@ -135,9 +135,14 @@ make deploy-kserve       # Deploy KServe
 make undeploy            # Remove all infrastructure
 make undeploy-kserve     # Remove KServe
 
-# Test (ODH conformance)
-make test NAMESPACE=llm-d           # Run conformance tests
+# Test (conformance - auto-detects EA1/EA2)
+make test NAMESPACE=llm-inference   # Run conformance tests
 make test PROFILE=kserve-gpu        # With specific profile
+
+# Mock model (no GPU required)
+make deploy-mock-model              # Deploy mock LLMInferenceService
+make test NAMESPACE=mock-vllm-test  # Test against mock
+make clean-mock-model               # Clean up mock
 
 # Other
 make status              # Show status
@@ -199,6 +204,10 @@ rhaii-on-xks/
 │   ├── sail-operator/            # Sail/Istio operator Helm chart
 │   ├── lws-operator/             # LWS operator Helm chart
 │   └── kserve/                   # KServe controller Helm chart (auto-generated)
+├── test/
+│   ├── conformance/              # Conformance tests (verify-llm-d-deployment.sh)
+│   ├── deploy-model.sh           # Deploy mock LLMInferenceService
+│   └── mock-vllm/                # Mock vLLM server (Dockerfile, server.py)
 ├── validation/                   # Preflight validation checks
 │   ├── llmd_xks_checks.py       # Validation script
 │   ├── Containerfile             # Container build
