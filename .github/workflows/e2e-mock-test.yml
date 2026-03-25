@@ -1,0 +1,173 @@
+name: E2E Mock vLLM Test
+
+on:
+  pull_request_target:
+    types: [opened, labeled, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  MOCK_IMAGE: localhost/vllm-mock:test
+  MOCK_NAMESPACE: mock-vllm-test
+  KIND_CLUSTER_NAME: rhaii-e2e
+
+jobs:
+  e2e-test:
+    name: E2E Mock vLLM Test
+    # Label gate: only runs when a maintainer adds this label, preventing
+    # untrusted fork PRs from executing arbitrary code with repo secrets.
+    if: contains(github.event.pull_request.labels.*.name, 'run-e2e-test')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Build mock vLLM image
+        run: docker build -t ${{ env.MOCK_IMAGE }} test/mock-vllm/
+
+      - name: Install helmfile and helm-diff
+        run: |
+          HELMFILE_VERSION=0.169.2
+          HELMFILE_SHA256="34a5ca9c5fda733f0322f7b12a2959b7de4ab125bcf6531337751e263b027d58"
+          curl -fsSL -o /tmp/helmfile.tar.gz \
+            "https://github.com/helmfile/helmfile/releases/download/v${HELMFILE_VERSION}/helmfile_${HELMFILE_VERSION}_linux_amd64.tar.gz"
+          echo "${HELMFILE_SHA256}  /tmp/helmfile.tar.gz" | sha256sum -c -
+          sudo tar xz -C /usr/local/bin helmfile < /tmp/helmfile.tar.gz
+          rm /tmp/helmfile.tar.gz
+          helm plugin install https://github.com/databus23/helm-diff --version v3.9.14
+
+      - name: Create KinD config
+        run: |
+          cat > /tmp/kind-config.yaml <<'EOF'
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+            - role: control-plane
+            - role: worker
+          EOF
+
+      - name: Create KinD cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: /tmp/kind-config.yaml
+
+      - name: Load mock image into KinD
+        run: kind load docker-image ${{ env.MOCK_IMAGE }} --name ${{ env.KIND_CLUSTER_NAME }}
+
+      - name: Configure pull credentials on KinD nodes
+        env:
+          PULL_SECRET: ${{ secrets.RAHII_ON_XKS_PULL_SECRET }}
+        run: |
+          for node in $(kind get nodes --name "$KIND_CLUSTER_NAME"); do
+            docker exec "$node" mkdir -p /var/lib/kubelet
+            docker exec -i "$node" tee /var/lib/kubelet/config.json > /dev/null <<< "$PULL_SECRET"
+            docker exec "$node" systemctl restart kubelet.service
+          done
+          kubectl wait --for=condition=Ready nodes --all --timeout=60s
+
+      - name: Configure pull secret for helmfile
+        env:
+          PULL_SECRET: ${{ secrets.RAHII_ON_XKS_PULL_SECRET }}
+        run: |
+          mkdir -p ~/.config/containers
+          python3 -c "
+          import json, os
+          data = json.loads(os.environ['PULL_SECRET'])
+          with open(os.path.expanduser('~/.config/containers/auth.json'), 'w') as f:
+              json.dump(data, f)
+          print('Pull secret configured')
+          "
+
+      - name: Deploy infrastructure (make deploy-all)
+        run: make deploy-all
+        timeout-minutes: 15
+
+      - name: Setup inference gateway
+        run: |
+          # Run setup-gateway.sh but override the Programmed wait for KinD
+          # (KinD has no LoadBalancer, so gateway stays AddressNotAssigned)
+          ./scripts/setup-gateway.sh || true
+
+          KSERVE_NS=$(kubectl get deployment llmisvc-controller-manager \
+            -n redhat-ods-applications -o name 2>/dev/null \
+            && echo redhat-ods-applications || echo opendatahub)
+
+          # Verify gateway is Accepted and pod is running
+          kubectl wait --for=condition=Accepted gateway/inference-gateway \
+            -n "$KSERVE_NS" --timeout=120s
+          echo "[OK] Gateway accepted"
+
+          kubectl wait --for=condition=Ready pod \
+            -l gateway.networking.k8s.io/gateway-name=inference-gateway \
+            -n "$KSERVE_NS" --timeout=120s
+          echo "[OK] Gateway pod ready"
+        timeout-minutes: 5
+
+      - name: Verify deployment
+        run: |
+          make status
+
+          echo ""
+          echo "=== Verifying components ==="
+
+          kubectl wait --for=condition=Available deployment/cert-manager-webhook \
+            -n cert-manager --timeout=120s
+          echo "[OK] cert-manager"
+
+          kubectl wait --for=condition=Available deployment -l app=istiod \
+            -n istio-system --timeout=120s
+          echo "[OK] Istiod"
+
+          KSERVE_NS=$(kubectl get deployment llmisvc-controller-manager \
+            -n redhat-ods-applications -o name 2>/dev/null \
+            && echo redhat-ods-applications || echo opendatahub)
+          kubectl wait --for=condition=Available \
+            deployment/llmisvc-controller-manager -n "$KSERVE_NS" --timeout=120s
+          echo "[OK] KServe controller"
+
+          echo ""
+          echo "=== All components verified ==="
+
+      - name: Deploy mock model
+        run: make deploy-mock-model
+        timeout-minutes: 5
+        env:
+          MOCK_IMAGE: ${{ env.MOCK_IMAGE }}
+          IMAGE_PULL_POLICY: IfNotPresent
+
+      - name: Run conformance tests
+        run: make test NAMESPACE=${{ env.MOCK_NAMESPACE }}
+
+      - name: Collect debug info on failure
+        if: failure()
+        run: |
+          echo "=== Debug Info ==="
+          make status || true
+          echo ""
+          echo "=== All pods ==="
+          kubectl get pods -A || true
+          echo ""
+          echo "=== Mock namespace ==="
+          kubectl get all -n ${{ env.MOCK_NAMESPACE }} || true
+          echo ""
+          echo "=== LLMInferenceService ==="
+          kubectl get llmisvc -A -o yaml || true
+          echo ""
+          echo "=== Events (mock namespace) ==="
+          kubectl get events -n ${{ env.MOCK_NAMESPACE }} --sort-by='.lastTimestamp' || true
+          echo ""
+          echo "=== Pod logs (mock namespace) ==="
+          for pod in $(kubectl get pods -n ${{ env.MOCK_NAMESPACE }} -o name 2>/dev/null); do
+            echo "--- $pod ---"
+            kubectl logs "$pod" -n ${{ env.MOCK_NAMESPACE }} --all-containers --tail=50 || true
+          done
+
+      - name: Clean up mock model
+        if: always()
+        run: make clean-mock-model || true
