@@ -94,18 +94,14 @@ jobs:
           # (KinD has no LoadBalancer, so gateway stays AddressNotAssigned)
           ./scripts/setup-gateway.sh || true
 
-          KSERVE_NS=$(kubectl get deployment llmisvc-controller-manager \
-            -n redhat-ods-applications -o name 2>/dev/null \
-            && echo redhat-ods-applications || echo opendatahub)
-
           # Verify gateway is Accepted and pod is running
           kubectl wait --for=condition=Accepted gateway/inference-gateway \
-            -n "$KSERVE_NS" --timeout=120s
+            -n opendatahub --timeout=120s
           echo "[OK] Gateway accepted"
 
           kubectl wait --for=condition=Ready pod \
             -l gateway.networking.k8s.io/gateway-name=inference-gateway \
-            -n "$KSERVE_NS" --timeout=120s
+            -n opendatahub --timeout=120s
           echo "[OK] Gateway pod ready"
         timeout-minutes: 5
 
@@ -124,11 +120,8 @@ jobs:
             -n istio-system --timeout=120s
           echo "[OK] Istiod"
 
-          KSERVE_NS=$(kubectl get deployment llmisvc-controller-manager \
-            -n redhat-ods-applications -o name 2>/dev/null \
-            && echo redhat-ods-applications || echo opendatahub)
           kubectl wait --for=condition=Available \
-            deployment/llmisvc-controller-manager -n "$KSERVE_NS" --timeout=120s
+            deployment/kserve-controller-manager -n opendatahub --timeout=120s
           echo "[OK] KServe controller"
 
           echo ""
