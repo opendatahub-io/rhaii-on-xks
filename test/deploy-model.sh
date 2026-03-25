@@ -16,6 +16,7 @@ set -euo pipefail
 NAMESPACE="mock-vllm-test"
 MODEL_NAME="mock-model"
 MOCK_IMAGE="${MOCK_IMAGE:-ghcr.io/opendatahub-io/rhaii-on-xks/vllm-mock:latest}"
+IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-Always}"
 TIMEOUT="${TIMEOUT:-180}"
 
 while [[ $# -gt 0 ]]; do
@@ -89,7 +90,7 @@ spec:
     containers:
     - name: main
       image: $MOCK_IMAGE
-      imagePullPolicy: Always
+      imagePullPolicy: $IMAGE_PULL_POLICY
       command: ["python3"]
       args: ["/app/server.py"]
       resources:
