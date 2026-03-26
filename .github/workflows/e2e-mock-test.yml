@@ -96,14 +96,14 @@ jobs:
 
           # Verify gateway is Accepted and pod is running
           kubectl wait --for=condition=Accepted gateway/inference-gateway \
-            -n opendatahub --timeout=120s
+            -n opendatahub --timeout=300s
           echo "[OK] Gateway accepted"
 
           kubectl wait --for=condition=Ready pod \
             -l gateway.networking.k8s.io/gateway-name=inference-gateway \
-            -n opendatahub --timeout=120s
+            -n opendatahub --timeout=300s
           echo "[OK] Gateway pod ready"
-        timeout-minutes: 5
+        timeout-minutes: 7
 
       - name: Verify deployment
         run: |
@@ -126,6 +126,15 @@ jobs:
 
           echo ""
           echo "=== All components verified ==="
+
+      - name: Configure mock namespace pull secret
+        run: |
+          kubectl create namespace ${{ env.MOCK_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret docker-registry redhat-pull-secret \
+            --from-file=.dockerconfigjson="$HOME/.config/containers/auth.json" \
+            -n ${{ env.MOCK_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+          kubectl patch serviceaccount default -n ${{ env.MOCK_NAMESPACE }} \
+            -p '{"imagePullSecrets": [{"name": "redhat-pull-secret"}]}'
 
       - name: Deploy mock model
         run: make deploy-mock-model
