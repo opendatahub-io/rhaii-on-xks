@@ -128,7 +128,7 @@ while [[ $elapsed -lt $TIMEOUT ]]; do
 done
 echo ""
 
-ready=$(kubectl get llmisvc "$MODEL_NAME" -n "$NAMESPACE" --no-headers 2>/dev/null | awk '{print $3}')
+ready=$(kubectl get llmisvc "$MODEL_NAME" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
 if [[ "$ready" != "True" ]]; then
     echo "[FAIL] LLMInferenceService not ready after ${TIMEOUT}s"
     kubectl get llmisvc,pods -n "$NAMESPACE"
