@@ -982,16 +982,15 @@ check_llminferenceservice_resources() {
         # Check each one's status
         local ready_count=0
         local not_ready=()
-        while IFS= read -r line; do
-            local name ready
-            name=$(echo "$line" | awk '{print $1}')
-            ready=$(echo "$line" | awk '{print $3}')
+        while IFS= read -r name; do
+            local ready
+            ready=$($KUBECTL get llminferenceservice "$name" -n "$LLMD_NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
             if [[ "$ready" == "True" ]]; then
                 ((ready_count++))
             else
                 not_ready+=("$name")
             fi
-        done < <($KUBECTL get llminferenceservice -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null)
+        done < <($KUBECTL get llminferenceservice -n "$LLMD_NAMESPACE" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null)
 
         if [[ "$ready_count" -eq "$llmisvc_count" ]]; then
             log_pass "All $llmisvc_count LLMInferenceService(s) are Ready"
