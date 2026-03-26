@@ -143,25 +143,35 @@ kubectl get pods -n "$NAMESPACE"
 SERVICE_URL=$(kubectl get llmisvc "$MODEL_NAME" -n "$NAMESPACE" -o jsonpath='{.status.url}')
 echo ""
 
+PF_PID=""
+cleanup_port_forward() {
+    [[ -n "$PF_PID" ]] && kill "$PF_PID" 2>/dev/null || true
+}
+trap cleanup_port_forward EXIT
+
 if [[ -z "$SERVICE_URL" ]]; then
     echo "[INFO] No external URL (no LoadBalancer — expected on KinD/minikube)"
     echo "[INFO] Testing inference via port-forward to mock pod..."
     POD_NAME=$(kubectl get pod -n "$NAMESPACE" -l app.kubernetes.io/name="$MODEL_NAME",kserve.io/component=workload -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [[ -z "$POD_NAME" ]]; then
+        echo "[WARN] Could not find mock pod for port-forward"
+        echo "=== Mock model deployed (inference not verified) ==="
+        echo "  LLMInferenceService: $MODEL_NAME"
+        echo "  Namespace:           $NAMESPACE"
+        echo "  Cleanup:             make clean-mock-model"
+        exit 0
+    fi
     kubectl port-forward -n "$NAMESPACE" "pod/$POD_NAME" 8000:8000 &
     PF_PID=$!
     sleep 3
     SERVICE_URL="https://localhost:8000"
-    CLEANUP_PF=true
 else
     echo "[INFO] Testing inference at $SERVICE_URL ..."
-    CLEANUP_PF=false
 fi
 
 RESPONSE=$(curl -s -k --max-time 30 -X POST "${SERVICE_URL}/v1/chat/completions" \
     -H "Content-Type: application/json" \
-    -d '{"model":"mock-model","messages":[{"role":"user","content":"Hello"}],"max_tokens":20}')
-
-[[ "$CLEANUP_PF" == "true" ]] && kill $PF_PID 2>/dev/null || true
+    -d '{"model":"mock-model","messages":[{"role":"user","content":"Hello"}],"max_tokens":20}' || true)
 
 if echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print('[PASS] Response:', d['choices'][0]['message']['content'])" 2>/dev/null; then
     echo ""

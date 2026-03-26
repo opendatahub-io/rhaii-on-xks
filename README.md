@@ -140,9 +140,10 @@ make test NAMESPACE=llm-inference   # Run conformance tests
 make test PROFILE=kserve-gpu        # With specific profile
 
 # Mock model (no GPU required)
-make deploy-mock-model              # Deploy mock LLMInferenceService
-make test NAMESPACE=mock-vllm-test  # Test against mock
-make clean-mock-model               # Clean up mock
+make deploy-mock-model                                    # Deploy mock LLMInferenceService
+MOCK_IMAGE=quay.io/myorg/vllm-mock:latest make deploy-mock-model  # Custom image
+make test NAMESPACE=mock-vllm-test                        # Test against mock
+make clean-mock-model                                     # Clean up mock
 
 # Other
 make status              # Show status
