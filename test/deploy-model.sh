@@ -66,8 +66,20 @@ spec:
 EOF
     MODEL_URI="local://mock-model"
 else
-    echo "[INFO] ClusterStorageContainer CRD not available — using hf://sshleifer/tiny-gpt2 (~500KB)"
-    MODEL_URI="hf://sshleifer/tiny-gpt2"
+    echo "[INFO] ClusterStorageContainer CRD not available — creating empty PVC for mock model"
+    kubectl apply -n "$NAMESPACE" -f - <<EOF
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mock-model-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Mi
+EOF
+    MODEL_URI="pvc://mock-model-pvc"
 fi
 
 # Deploy LLMInferenceService with mock image
