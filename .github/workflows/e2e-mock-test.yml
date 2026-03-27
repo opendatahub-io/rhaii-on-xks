@@ -2,11 +2,10 @@ name: E2E Mock vLLM Test
 
 on:
   pull_request_target:
-    types: [opened, labeled, synchronize, reopened]
+    types: [labeled, synchronize]
     branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
 
 env:
   MOCK_IMAGE: localhost/vllm-mock:test
@@ -14,11 +13,35 @@ env:
   KIND_CLUSTER_NAME: rhaii-e2e
 
 jobs:
+  # Remove run-e2e-test label on new pushes to force re-review
+  remove-label-on-push:
+    name: Remove e2e label on push
+    permissions:
+      pull-requests: write
+    if: >-
+      github.event.action == 'synchronize' &&
+      contains(github.event.pull_request.labels.*.name, 'run-e2e-test')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove run-e2e-test label
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              name: 'run-e2e-test'
+            });
+            console.log('Removed run-e2e-test label — maintainer must re-add after reviewing new code');
+
   e2e-test:
     name: E2E Mock vLLM Test
-    # Label gate: only runs when a maintainer adds this label, preventing
-    # untrusted fork PRs from executing arbitrary code with repo secrets.
-    if: contains(github.event.pull_request.labels.*.name, 'run-e2e-test')
+    permissions:
+      contents: read
+    # Only runs when a maintainer adds the run-e2e-test label specifically.
+    # Does not trigger on other labels or on synchronize (new pushes).
+    if: github.event.action == 'labeled' && github.event.label.name == 'run-e2e-test'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR code
