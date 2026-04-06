@@ -3,7 +3,7 @@ name: E2E Mock vLLM Test
 on:
   pull_request_target:
     types: [labeled, synchronize]
-    branches: [main]
+    branches: [main, 'release-*']
 
 permissions: {}
 
