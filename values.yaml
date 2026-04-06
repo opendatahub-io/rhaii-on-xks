@@ -40,4 +40,4 @@ rhclOperator:
 # =============================================================================
 
 # KServe OCI chart version (dev variant until official builds are on registry.redhat.io)
-kserveChartVersion: "3.4.0-ea.2+cf8a9b5"
+kserveChartVersion: "3.4.0-ea.2+37529e9"
