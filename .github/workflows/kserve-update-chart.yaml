@@ -13,23 +13,23 @@ on:
       kserve_ref:
         description: 'KServe branch/tag to use'
         required: false
-        default: 'rhoai-3.4-ea.1'
+        default: 'rhoai-3.4-ea.2'
       rhoai_branch:
         description: 'RHOAI-Build-Config branch for images'
         required: false
-        default: 'rhoai-3.4-ea.1'
+        default: 'rhoai-3.4-ea.2'
       image_tag:
         description: 'Image tag for quay.io replacements'
         required: false
-        default: '3.4.0-ea.1'
+        default: '3.4.0-ea.2'
 
 permissions: { }
 
 env:
   KSERVE_REPO: ${{ github.event.inputs.kserve_repo || 'red-hat-data-services/kserve' }}
-  KSERVE_REF: ${{ github.event.inputs.kserve_ref || 'rhoai-3.4-ea.1' }}
-  RHOAI_BRANCH: ${{ github.event.inputs.rhoai_branch || 'rhoai-3.4-ea.1' }}
-  IMAGE_TAG: ${{ github.event.inputs.image_tag || '3.4.0-ea.1' }}
+  KSERVE_REF: ${{ github.event.inputs.kserve_ref || 'rhoai-3.4-ea.2' }}
+  RHOAI_BRANCH: ${{ github.event.inputs.rhoai_branch || 'rhoai-3.4-ea.2' }}
+  IMAGE_TAG: ${{ github.event.inputs.image_tag || '3.4.0-ea.2' }}
 
 jobs:
   update-chart:

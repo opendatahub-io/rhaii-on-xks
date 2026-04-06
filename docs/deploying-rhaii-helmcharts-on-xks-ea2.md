@@ -166,12 +166,12 @@ The cloud manager orchestrates the following bootstrap sequence automatically:
 
 ## 3. Installing the RHAII Operator
 
-For detailed Helm chart configuration options, see the [RHAII Helm Chart README](https://github.com/opendatahub-io/odh-gitops/blob/main/charts/rhaii-helm-chart/README.md).
+For detailed Helm chart configuration options, see the [RHAII Helm Chart README](https://github.com/opendatahub-io/odh-gitops/blob/main/charts/rhai-on-xks-chart/README.md).
 
 ### 3.1 Install on Azure Kubernetes Service
 
 ```bash
-helm upgrade rhaii ./charts/rhaii-helm-chart/ \
+helm upgrade rhaii ./charts/rhai-on-xks-chart/ \
   --install --create-namespace \
   --namespace rhaii \
   --set azure.enabled=true \
@@ -181,7 +181,7 @@ helm upgrade rhaii ./charts/rhaii-helm-chart/ \
 ### 3.2 Install on CoreWeave Kubernetes Service
 
 ```bash
-helm upgrade rhaii ./charts/rhaii-helm-chart/ \
+helm upgrade rhaii ./charts/rhai-on-xks-chart/ \
   --install --create-namespace \
   --namespace rhaii \
   --set coreweave.enabled=true \
@@ -537,5 +537,5 @@ For assistance with Red Hat AI Inference Server deployments, contact Red Hat Sup
 
 **Additional Resources:**
 
-* [RHAII Helm Chart README](https://github.com/opendatahub-io/odh-gitops/blob/main/charts/rhaii-helm-chart/README.md) — Helm chart configuration and installation
+* [RHAII Helm Chart README](https://github.com/opendatahub-io/odh-gitops/blob/main/charts/rhai-on-xks-chart/README.md) — Helm chart configuration and installation
 * [KServe LLMInferenceService Samples](https://github.com/red-hat-data-services/kserve/tree/rhoai-3.4/docs/samples/llmisvc) — Example inference service configurations

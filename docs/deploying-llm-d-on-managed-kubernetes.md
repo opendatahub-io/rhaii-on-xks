@@ -163,7 +163,7 @@ Distributed Inference with llm-d on Red Hat AI Inference consists of the followi
 | **cert-manager** | 1.15.2 | Manages TLS certificates for mTLS between components |
 | **Istio (Sail Operator)** | 3.2.1 / 1.27.x | Provides Gateway API implementation for inference routing |
 | **LeaderWorkerSet (LWS)** | 1.0 | Enables multi-node inference for large models |
-| **KServe Controller** | 0.15 (chart 3.4.0-ea.1) | Manages LLMInferenceService lifecycle |
+| **KServe Controller** | 0.17 (chart 3.4.0-ea.2) | Manages LLMInferenceService lifecycle |
 | **Gateway API** | 1.4.0 | Routes external traffic to inference endpoints (also compatible with 1.3.0+) |
 
 ### Component Interaction
@@ -702,10 +702,10 @@ make deploy-kserve
 | Sail Operator (Istio) | 3.2.1 | `registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle:3.2` |
 | Istio | 1.27.x | Dynamic resolution via `v1.27-latest` |
 | LeaderWorkerSet | 1.0 | `registry.k8s.io/lws/lws-controller` |
-| KServe Controller | 0.15 (chart 3.4.0-ea.1) | `registry.redhat.io` (via `charts/kserve/`) |
+| KServe Controller | 0.17 (chart 3.4.0-ea.2) | `registry.redhat.io` (via `charts/kserve/`) |
 | Gateway API | 1.4.0 | Also compatible with 1.3.0+ |
-| vLLM (CUDA) | 3.4.0-ea.1 | `registry.redhat.io/rhaiis/vllm-cuda-rhel9` |
-| vLLM (ROCm) | 3.4.0-ea.1 | `registry.redhat.io/rhaiis/vllm-rocm-rhel9` |
+| vLLM (CUDA) | 3.4.0-ea.2 | `registry.redhat.io/rhaiis/vllm-cuda-rhel9` |
+| vLLM (ROCm) | 3.4.0-ea.2 | `registry.redhat.io/rhaiis/vllm-rocm-rhel9` |
 
 ### API Versions
 

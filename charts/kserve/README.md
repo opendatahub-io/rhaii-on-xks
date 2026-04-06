@@ -76,7 +76,7 @@ For production deployments, replace the self-signed issuer with a proper CA (e.g
 ### From OCI Registry
 
 ```bash
-# Production version (e.g., 3.4.0-ea.1+abc1234)
+# Production version (e.g., 3.4.0-ea.2+abc1234)
 helm install rhaii-xks-kserve oci://ghcr.io/<owner>/kserve-rhaii-xks:<version> \
   --namespace opendatahub \
   --create-namespace
@@ -85,7 +85,7 @@ helm install rhaii-xks-kserve oci://ghcr.io/<owner>/kserve-rhaii-xks:<version> \
 Or use a development version (uses midstream kserve images):
 
 ```bash
-# Dev version (e.g., 3.4.0-ea.1-dev+abc1234)
+# Dev version (e.g., 3.4.0-ea.2-dev+abc1234)
 helm install rhaii-xks-kserve oci://ghcr.io/<owner>/kserve-rhaii-xks:<version>-dev+<sha> \
   --namespace opendatahub \
   --create-namespace
@@ -113,7 +113,7 @@ The chart resources are generated from Kustomize overlays using the `generate-ch
 | Option            | Default      | Description                                  |
 |-------------------|--------------|----------------------------------------------|
 | `--overlay PATH`  | (required)   | Path to Kustomize overlay                    |
-| `--tag TAG`       | `3.4.0-ea.1` | Image tag for quay.io replacements           |
+| `--tag TAG`       | `3.4.0-ea.2` | Image tag for quay.io replacements           |
 | `--branch BRANCH` | `rhoai-3.4`  | RHOAI-Build-Config branch for image mappings |
 
 ### Example
@@ -122,7 +122,7 @@ The chart resources are generated from Kustomize overlays using the `generate-ch
 ./generate-chart.sh \
   --overlay ~/kserve/config/overlays/odh-xks \
   --branch rhoai-3.4 \
-  --tag 3.4.0-ea.1
+  --tag 3.4.0-ea.2
 ```
 
 ### Image Replacement Logic
@@ -142,7 +142,7 @@ Automatically regenerates the chart from upstream KServe and creates a PR if cha
 - `kserve_repo`: KServe repository (default: `red-hat-data-services/kserve`)
 - `kserve_ref`: KServe branch/tag (default: `rhoai-3.4`)
 - `rhoai_branch`: RHOAI-Build-Config branch (default: `rhoai-3.4`)
-- `image_tag`: Image tag for quay.io replacements (default: `3.4.0-ea.1`)
+- `image_tag`: Image tag for quay.io replacements (default: `3.4.0-ea.2`)
 
 ### Release (on push to main)
 

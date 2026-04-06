@@ -17,7 +17,7 @@ Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLM
 | cert-manager-operator | 1.15.2 | TLS certificate management |
 | sail-operator (Istio) | 3.2.1 / 1.27.x | Gateway API for inference routing |
 | lws-operator | 1.0 | LeaderWorkerSet controller for multi-node workloads |
-| kserve | 3.4.0-ea.1 | KServe controller for LLMInferenceService lifecycle |
+| kserve | 3.4.0-ea.2 | KServe controller for LLMInferenceService lifecycle |
 | Gateway API | 1.4.0 | Standard Kubernetes ingress for inference routing (also compatible with 1.3.0+) |
 | rhcl (optional) | 1.2.0 | API gateway authentication, authorization, and rate limiting ([Kuadrant](https://kuadrant.io/)) |
 

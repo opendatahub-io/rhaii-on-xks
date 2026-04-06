@@ -2,7 +2,7 @@ name: Kserve Release Chart
 
 on:
   push:
-    branches: [main, rhoai-*, odh-*, master]
+    branches: [main, release-*, rhoai-*, odh-*, master]
     paths:
       - 'charts/kserve/**'
       - '.github/workflows/kserve-release.yaml'
@@ -84,7 +84,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: 'opendatahub-io/kserve'
-          ref: 'release-v0.15'
+          ref: 'release-v0.17'
           path: charts/kserve/kserve
           persist-credentials: false
 

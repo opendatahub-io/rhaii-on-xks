@@ -59,7 +59,7 @@ helmfiles:
 ---
 
 {{ $kserveChart := "oci://ghcr.io/opendatahub-io/kserve-rhaii-xks" }}
-{{ $kserveVersion := .Values.kserveChartVersion | default "3.4.0-ea.1-dev-8a30e66" }}
+{{ $kserveVersion := .Values.kserveChartVersion | default "3.4.0-ea.2" }}
 
 releases:
   - name: kserve-rhaii-xks
