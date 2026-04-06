@@ -219,24 +219,3 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: |
           helm push *.tgz "oci://ghcr.io/${OWNER,,}"
-
-      - name: Auto-update default chart version
-        if: startsWith(github.ref_name, 'release-')
-        env:
-          VERSION: ${{ steps.chart.outputs.version }}
-          BRANCH: ${{ github.ref_name }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          sed -i "s/kserveChartVersion: .*/kserveChartVersion: \"${VERSION}\"/" values.yaml
-          sed -i "s/default \"[^\"]*\"/default \"${VERSION}\"/" helmfile.yaml.gotmpl
-
-          if git diff --quiet values.yaml helmfile.yaml.gotmpl; then
-            echo "No version change needed"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add values.yaml helmfile.yaml.gotmpl
-          git commit -m "chore: auto-update default dev chart version to ${VERSION}"
-          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${BRANCH}"
