@@ -2,38 +2,6 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
-  creationTimestamp: null
-  labels:
-    app.kubernetes.io/component: kserve
-    app.kubernetes.io/name: kserve
-  name: clusterservingruntime.serving.kserve.io
-webhooks:
-  - admissionReviewVersions:
-      - v1beta1
-    clientConfig:
-      service:
-        name: kserve-webhook-server-service
-        namespace: kserve
-        path: /validate-serving-kserve-io-v1alpha1-clusterservingruntime
-    failurePolicy: Fail
-    name: clusterservingruntime.kserve-webhook-server.validator
-    rules:
-      - apiGroups:
-          - serving.kserve.io
-        apiVersions:
-          - v1alpha1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - clusterservingruntimes
-    sideEffects: None
----
-apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingWebhookConfiguration
-metadata:
-  annotations:
     cert-manager.io/inject-ca-from: opendatahub/llmisvc-webhook-server
   creationTimestamp: null
   name: llminferenceservice.serving.kserve.io
