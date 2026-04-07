@@ -1,14 +1,16 @@
-# Deploying Red Hat AI Inference Server on Managed Kubernetes
+# Deploying Red Hat AI Inference Server: Distributed Inference with llm-d
 
 **Product:** Red Hat AI Inference Server (RHAIIS)
 **Version:** 3.4
 **Platforms:** Azure Kubernetes Service (AKS), CoreWeave Kubernetes Service (CKS)
 
+> **Deploying on OpenShift?** See the [Deploying on OpenShift](./deploying-on-openshift.md) guide instead.
+
 ---
 
 ## Executive Summary
 
-This guide provides step-by-step instructions for deploying Red Hat AI Inference Server on managed Kubernetes platforms. Red Hat AI Inference Server enables enterprise-grade Large Language Model (LLM) inference with features including:
+This guide provides step-by-step instructions for deploying Distributed Inference with llm-d for Red Hat AI Inference Server. Distributed Inference with llm-d Server enables enterprise-grade Large Language Model (LLM) inference with features including:
 
 - **Intelligent request routing** using the Endpoint Picker Processor (EPP)
 - **Disaggregated serving** with prefill-decode separation for optimal throughput
@@ -28,9 +30,10 @@ This guide provides step-by-step instructions for deploying Red Hat AI Inference
 5. [Deploying an LLM Inference Service](#5-deploying-an-llm-inference-service)
 6. [Verifying the Deployment](#6-verifying-the-deployment)
 7. [Optional: Enabling Monitoring](#7-optional-enabling-monitoring)
-8. [Collecting Debug Information](#8-collecting-debug-information)
-9. [Troubleshooting](#9-troubleshooting)
-10. [Appendix: Component Versions](#appendix-component-versions)
+8. [Optional: Enabling RHCL (API Gateway, Auth, Rate Limiting)](#8-optional-enabling-rhcl-api-gateway-auth-rate-limiting)
+9. [Collecting Debug Information](#9-collecting-debug-information)
+10. [Troubleshooting](#10-troubleshooting)
+11. [Appendix: Component Versions](#appendix-component-versions)
 
 ---
 
@@ -40,10 +43,10 @@ This guide provides step-by-step instructions for deploying Red Hat AI Inference
 
 | Requirement | Specification |
 |-------------|---------------|
-| Kubernetes Version | 1.28 or later |
+| Kubernetes Version | 1.33+ or later |
 | Supported Platforms | AKS, CKS (CoreWeave) |
-| GPU Nodes | NVIDIA A10, A100, or H100 (for GPU workloads) |
-| NVIDIA Device Plugin | Installed and configured |
+| GPU Nodes | Supported NVIDIA/AMD GPU nodes |
+| GPU Device Plugin | Installed and configured ([NVIDIA](https://github.com/NVIDIA/k8s-device-plugin), [AMD](https://github.com/ROCm/k8s-device-plugin)) |
 
 ### 1.2 Client Tools
 
@@ -51,13 +54,13 @@ Install the following tools on your workstation:
 
 | Tool | Minimum Version | Purpose |
 |------|-----------------|---------|
-| `kubectl` | 1.28+ | Kubernetes CLI |
-| `helm` | 3.17+ | Helm package manager |
-| `helmfile` | 0.160+ | Declarative Helm deployments |
+| [`kubectl`](https://kubernetes.io/docs/tasks/tools/) | 1.33+ | Kubernetes CLI |
+| [`helm`](https://helm.sh/docs/intro/install/) | 3.17+ | Helm package manager |
+| [`helmfile`](https://github.com/helmfile/helmfile#installation) | 0.160+ | Declarative Helm deployments |
 
 ### 1.3 Red Hat Registry Authentication
 
-Red Hat AI Inference Server images are hosted on `registry.redhat.io` and require authentication.
+RHAIIS images are hosted on `registry.redhat.io` and require authentication.
 
 **Procedure:**
 
@@ -83,7 +86,7 @@ Red Hat AI Inference Server images are hosted on `registry.redhat.io` and requir
    podman pull registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle:3.2
 
    # Verify access to RHAIIS vLLM image
-   podman pull registry.redhat.io/rhaiis-tech-preview/vllm-openai-rhel9:latest
+   podman pull registry.redhat.io/rhaiis/vllm-cuda-rhel9:latest
    ```
 
    Credentials are stored automatically in `~/.config/containers/auth.json` after successful login.
@@ -123,7 +126,7 @@ kubectl describe nodes | grep -A5 "nvidia.com/gpu"
 
 ## 1.5 Preflight Validation (Recommended)
 
-Run the preflight validation checks to verify your cluster is properly configured:
+Run the [preflight validation](../validation/README.md) checks to verify your cluster is properly configured:
 
 ```bash
 # Build the validation container
@@ -153,15 +156,15 @@ See the [Preflight Validation README](../validation/README.md) for configuration
 
 ## 2. Architecture Overview
 
-Red Hat AI Inference Server on managed Kubernetes consists of the following components:
+Distributed Inference with llm-d on Red Hat AI Inference consists of the following components:
 
-| Component | Description |
-|-----------|-------------|
-| **cert-manager** | Manages TLS certificates for mTLS between components |
-| **Istio (Sail Operator)** | Provides Gateway API implementation for inference routing |
-| **LeaderWorkerSet (LWS)** | Enables multi-node inference for large models |
-| **KServe Controller** | Manages LLMInferenceService lifecycle |
-| **Inference Gateway** | Routes external traffic to inference endpoints |
+| Component | Version | Description |
+|-----------|---------|-------------|
+| **cert-manager** | 1.15.2 | Manages TLS certificates for mTLS between components |
+| **Istio (Sail Operator)** | 3.2.1 / 1.27.x | Provides Gateway API implementation for inference routing |
+| **LeaderWorkerSet (LWS)** | 1.0 | Enables multi-node inference for large models |
+| **KServe Controller** | 0.15 (chart 3.4.0-ea.1) | Manages LLMInferenceService lifecycle |
+| **Gateway API** | 1.4.0 | Routes external traffic to inference endpoints (also compatible with 1.3.0+) |
 
 ### Component Interaction
 
@@ -468,7 +471,121 @@ kubectl get podmonitors -n <llmisvc-namespace>
 
 ---
 
-## 8. Collecting Debug Information
+## 8. Optional: Enabling RHCL (API Gateway, Auth, Rate Limiting)
+
+Red Hat Connectivity Link (RHCL) provides API gateway authentication, authorization, and rate limiting for inference endpoints. It deploys the Kuadrant operator stack (Kuadrant, Authorino, Limitador) and is **disabled by default**.
+
+### 8.1 Enable RHCL
+
+Edit `values.yaml` to enable:
+
+```yaml
+rhclOperator:
+  enabled: true
+  operators:
+    dns:
+      enabled: false  # Set to true if you need DNS policy management
+```
+
+### 8.2 Deploy
+
+Deploy RHCL after the baseline stack is running:
+
+```bash
+cd charts/rhcl && helmfile apply
+```
+
+This will:
+1. Create namespaces (`kuadrant-operators`, `kuadrant-system`)
+2. Deploy 3 operators (Kuadrant, Authorino, Limitador)
+3. Install 14 CRDs
+4. Create a Kuadrant instance and wait for it to be ready
+
+> **Note:** RHCL requires cert-manager and Istio (sail-operator) to be deployed first. Run `make deploy-all` before enabling RHCL.
+
+> **Note:** When deploying standalone via `cd charts/rhcl && helmfile apply`, the chart reads its own `charts/rhcl/values.yaml` directly. The root `values.yaml` `rhclOperator` settings only apply when deploying via the root helmfile (`helmfile apply` from the repo root).
+
+### 8.3 Verify
+
+```bash
+# Check operators
+kubectl get pods -n kuadrant-operators
+
+# Check Kuadrant instance
+kubectl get kuadrant -n kuadrant-system
+
+# Check sub-operator instances
+kubectl get authorino,limitador -n kuadrant-system
+```
+
+All operators should show `1/1 Running` and the Kuadrant CR should show `Ready`.
+
+### 8.4 Creating Policies
+
+After RHCL is deployed, you can create policies targeting your Gateways and HTTPRoutes:
+
+**AuthPolicy** (API key authentication on an HTTPRoute):
+```yaml
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: my-auth
+  namespace: my-app
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: my-route
+  rules:
+    authentication:
+      api-key-auth:
+        apiKey:
+          selector: {}
+        credentials:
+          queryString:
+            name: apikey
+```
+
+**RateLimitPolicy** (rate limiting on a Gateway):
+```yaml
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: my-ratelimit
+  namespace: my-gateway-ns
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: my-gateway
+  limits:
+    default-limits:
+      rates:
+        - limit: 10
+          window: 10s
+```
+
+### 8.5 Running Integration Tests
+
+```bash
+./test/conformance/verify-rhcl-deployment.sh
+```
+
+This deploys a test Gateway, HTTPRoute, AuthPolicy, and RateLimitPolicy, validates enforcement, and cleans up.
+
+### 8.6 Disabling RHCL
+
+Set `rhclOperator.enabled: false` in `values.yaml`, or uninstall:
+
+```bash
+cd charts/rhcl && helmfile destroy
+```
+
+For detailed configuration, see [charts/rhcl/README.md](../charts/rhcl/README.md).
+
+---
+
+## 9. Collecting Debug Information
 
 If you encounter issues during or after deployment, collect diagnostic data for troubleshooting:
 
@@ -497,9 +614,9 @@ See the full guide: [Collecting Debug Information](./collecting-debug-informatio
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
-### 9.1 Controller Pod Stuck in ContainerCreating
+### 10.1 Controller Pod Stuck in ContainerCreating
 
 **Symptom:** The `kserve-controller-manager` pod remains in `ContainerCreating` state.
 
@@ -517,7 +634,7 @@ kubectl get certificate -n cert-manager
 make deploy-kserve
 ```
 
-### 9.2 Gateway Pod Shows ErrImagePull
+### 10.2 Gateway Pod Shows ErrImagePull
 
 **Symptom:** The Gateway pod fails with `ErrImagePull` or `ImagePullBackOff`.
 
@@ -532,7 +649,7 @@ kubectl patch sa inference-gateway-istio -n opendatahub \
 kubectl delete pod -n opendatahub -l gateway.networking.k8s.io/gateway-name=inference-gateway
 ```
 
-### 9.3 LLMInferenceService Pod Shows FailedScheduling
+### 10.3 LLMInferenceService Pod Shows FailedScheduling
 
 **Symptom:** The inference pod shows `FailedScheduling` with message "Insufficient nvidia.com/gpu".
 
@@ -552,7 +669,7 @@ kubectl delete pod -n opendatahub -l gateway.networking.k8s.io/gateway-name=infe
 
 3. Add matching tolerations to the LLMInferenceService spec (see Section 5.3).
 
-### 9.4 Webhook Validation Errors During Deployment
+### 10.4 Webhook Validation Errors During Deployment
 
 **Symptom:** Deployment fails with "no endpoints available for service" webhook errors.
 
@@ -582,7 +699,9 @@ make deploy-kserve
 | Istio | 1.27.x | Dynamic resolution via `v1.27-latest` |
 | LeaderWorkerSet | 1.0 | `registry.k8s.io/lws/lws-controller` |
 | KServe Controller | 0.15 (chart 3.4.0-ea.1) | `registry.redhat.io` (via `charts/kserve/`) |
-| vLLM | Latest | `registry.redhat.io/rhaiis-tech-preview/vllm-openai-rhel9` |
+| Gateway API | 1.4.0 | Also compatible with 1.3.0+ |
+| vLLM (CUDA) | 3.4.0-ea.1 | `registry.redhat.io/rhaiis/vllm-cuda-rhel9` |
+| vLLM (ROCm) | 3.4.0-ea.1 | `registry.redhat.io/rhaiis/vllm-rocm-rhel9` |
 
 ### API Versions
 

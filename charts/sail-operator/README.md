@@ -84,6 +84,29 @@ gatewayAPI:
 
 > **Note:** Gateway API CRDs are still installed by the sail-operator chart since KServe doesn't include them in its kustomize configuration.
 
+### Values
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `namespace` | Operator namespace | `istio-system` |
+| `bundle.source` | Bundle source (`redhat` or `konflux`) | `redhat` |
+| `bundle.version` | OLM bundle version | `3.2.1` |
+| `istioVersion` | Istio version to deploy | `v1.27-latest` |
+| `pullSecret.name` | Pull secret name | `redhat-pull-secret` |
+| `pullSecret.dockerConfigJson` | Docker config (set by helmfile) | `""` |
+| `gatewayAPI.version` | Gateway API CRD version | `v1.4.0` |
+| `gatewayAPI.inferenceExtension.enabled` | Install Inference Extension CRDs | `true` |
+| `gatewayAPI.inferenceExtension.version` | Inference Extension CRD version | `v1.2.0` |
+| `fixWebhookLoop.enabled` | Fix webhook reconciliation loop | `true` |
+| `inferenceGateway.enabled` | Create inference gateway | `true` |
+| `inferenceGateway.name` | Gateway name | `inference-gateway` |
+| `inferenceGateway.namespace` | Gateway namespace | `opendatahub` |
+| `inferenceGateway.caBundle.sourceSecret` | CA source secret | `opendatahub-ca` |
+| `inferenceGateway.caBundle.sourceNamespace` | CA source namespace | `cert-manager` |
+| `inferenceGateway.caBundle.sourceKey` | CA secret key | `tls.crt` |
+| `inferenceGateway.caBundle.configMapName` | ConfigMap name for CA bundle | `odh-ca-bundle` |
+| `inferenceGateway.caBundle.mountPath` | CA mount path in Gateway pod | `/var/run/secrets/opendatahub` |
+
 ## What Gets Deployed
 
 **Presync hooks** (before Helm install):
@@ -133,45 +156,15 @@ gatewayAPI:
 | 3.1.4 | v1.26.6 | `v1.26.6` |
 | 3.2.1 | v1.27.3 | `v1.27.3` |
 
-## Update to New Bundle Version
+## Upgrade
 
 ```bash
-# Update chart manifests
-./scripts/update-bundle.sh 3.3.0 redhat
+# (Optional) Update to a new bundle version
+./scripts/update-bundle.sh <version>
 
-# Redeploy
-helmfile apply
+# Deploy
+make deploy
 ```
-
-### Clean Upgrade (Recommended for version changes)
-
-When changing OSSM/Istio versions, do a clean upgrade to avoid stale resources:
-
-```bash
-# 1. Delete the Istio CR (triggers istiod cleanup)
-kubectl delete istio default -n istio-system
-
-# 2. Wait for istiod to be removed
-kubectl wait --for=delete pod -l app=istiod -n istio-system --timeout=120s
-
-# 3. Delete problematic CRDs (if switching major versions)
-kubectl delete crd ztunnels.sailoperator.io --ignore-not-found
-
-# 4. Update the bundle
-./scripts/update-bundle.sh 3.1.4 redhat
-
-# 5. Update istioVersion in values.yaml to match bundle
-# OSSM 3.1.x -> v1.26.x, OSSM 3.2.x -> v1.27.x
-# Linux (GNU sed):
-sed -i 's/istioVersion: .*/istioVersion: "v1.26.6"/' values.yaml
-# macOS (BSD sed):
-# sed -i '' 's/istioVersion: .*/istioVersion: "v1.26.6"/' values.yaml
-
-# 6. Redeploy
-helmfile apply
-```
-
-> **Note:** The `istio-cr.yaml` template uses `{{ .Values.istioVersion }}` so you must update values.yaml when changing OSSM versions.
 
 ## Update Pull Secret
 

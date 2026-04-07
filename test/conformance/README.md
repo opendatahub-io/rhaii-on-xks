@@ -1,18 +1,36 @@
 # LLM-D Conformance Tests
 
-Conformance tests validate that LLM-D deployments meet expected specifications for each deployment profile/guide.
+Conformance tests validate that LLM-D and KServe LLMInferenceService deployments meet expected specifications for each deployment profile/guide.
 
 ## Quick Start
 
 ```bash
-# Run conformance test with auto-detection
-./verify-llm-d-deployment.sh --namespace llm-d
+# Run via Makefile (auto-detects EA1/EA2 KServe namespace)
+make test NAMESPACE=llm-inference
+
+# Deploy mock model and test (no GPU required)
+make deploy-mock-model
+make test NAMESPACE=mock-vllm-test
+make clean-mock-model
+
+# Run directly with options
+./verify-llm-d-deployment.sh --kserve --namespace llm-inference
 
 # Test specific profile
 ./verify-llm-d-deployment.sh --profile inference-scheduling --namespace llm-d
 
 # List available profiles
 ./verify-llm-d-deployment.sh --list-profiles
+```
+
+## Mock vLLM Testing
+
+A mock vLLM server is available for testing the KServe control plane without GPUs or real models. See [`test/mock-vllm/README.md`](../mock-vllm/README.md) for details.
+
+```bash
+make deploy-mock-model    # Deploy mock LLMInferenceService
+make test NAMESPACE=mock-vllm-test   # Run conformance
+make clean-mock-model     # Clean up
 ```
 
 ## Available Profiles
@@ -28,6 +46,8 @@ Profiles match official llm-d guides: https://github.com/llm-d/llm-d/tree/main/g
 | `tiered-prefix-cache` | Tiered prefix caching | CPU offload, tiered cache config |
 | `simulated-accelerators` | Testing without GPUs | Simulated workers, no GPU requests |
 | `quickstart` | Basic deployment | EPP, ModelService, InferencePool |
+| `kserve-basic` | KServe LLMInferenceService (basic) | LLMInferenceService, vLLM pods, HTTPRoute |
+| `kserve-gpu` | KServe LLMInferenceService (GPU) | LLMInferenceService, vLLM pods, HTTPRoute, GPU |
 
 ## What Gets Tested
 

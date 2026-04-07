@@ -1,0 +1,82 @@
+{{- if .Values.operators.dns.enabled }}
+apiVersion: {{ include "rhcl.deployment.apiVersion" . }}
+kind: Deployment
+metadata:
+  name: dns-operator-controller-manager
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dns-operator
+    control-plane: controller-manager
+spec:
+  replicas: {{ .Values.operators.dns.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/component: dns-operator
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+        app.kubernetes.io/component: dns-operator
+    spec:
+      serviceAccountName: dns-operator-controller-manager
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        {{- $defaults := dict "runAsNonRoot" true "seccompProfile" (dict "type" "RuntimeDefault") }}
+        {{- toYaml (mergeOverwrite $defaults (.Values.operators.dns.podSecurityContext | default dict)) | nindent 8 }}
+      containers:
+        - name: manager
+          image: {{ include "rhcl.image" (dict "registry" .Values.images.registry "repository" .Values.images.operators.dns.repository "digest" .Values.images.operators.dns.digest) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          args:
+            - --metrics-bind-address=:8080
+            - --leader-elect
+          env:
+            - name: WATCH_NAMESPACES
+              value: ""
+            - name: CLUSTER_SECRET_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- if .Values.operators.dns.env }}
+            {{- toYaml .Values.operators.dns.env | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.operators.dns.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+      {{- with .Values.operators.dns.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operators.dns.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operators.dns.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -7,7 +7,7 @@ Deploy Red Hat cert-manager Operator on any Kubernetes cluster without OLM.
 This chart uses **olm-extractor** to extract manifests directly from Red Hat's OLM bundle, enabling deployment on non-OLM Kubernetes clusters (AKS, CoreWeave) while:
 
 - **Minimizing OCP team burden** - Uses exact manifests from Red Hat's OLM bundles
-- **Easy upgrades** - Single command: `./scripts/update-bundle.sh <version>`
+- **Easy upgrades** - Update bundle with `./scripts/update-bundle.sh <version>`, then `make deploy`
 - **Incremental consolidation** - Helm templating can be added gradually
 - **No breaking changes** - Only minimal patches for non-OLM environments
 
@@ -68,6 +68,17 @@ Then in `environments/default.yaml`:
 ```yaml
 pullSecretFile: ~/pull-secret.txt
 ```
+
+### Values
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `operatorNamespace` | Operator namespace | `cert-manager-operator` |
+| `operandNamespace` | Operand namespace | `cert-manager` |
+| `bundle.version` | OLM bundle version | `v1.15.2` |
+| `pullSecret.name` | Pull secret name | `redhat-pull-secret` |
+| `pullSecret.dockerConfigJson` | Docker config (set by helmfile) | `""` |
+| `certManager.enabled` | Create CertManager CR | `true` |
 
 ## What Gets Deployed
 
@@ -131,17 +142,15 @@ EOF
 ./scripts/cleanup.sh
 ```
 
-## Update to New Bundle Version
+## Upgrade
 
 ```bash
-./scripts/update-bundle.sh v1.18.0
-helmfile apply
-```
+# (Optional) Update to a new bundle version
+./scripts/update-bundle.sh <version>
 
-The update-bundle.sh script:
-- Extracts manifests from Red Hat's OLM bundle (deployment, RBAC, CRDs)
-- Applies minimal fixes for non-OLM environments
-- Preserves OpenShift API stub CRDs
+# Deploy
+make deploy
+```
 
 ## Update Pull Secret
 

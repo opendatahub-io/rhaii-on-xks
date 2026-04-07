@@ -1,0 +1,12 @@
+{{- if and .Values.rbac.create .Values.operators.limitador.enabled }}
+# Allows Prometheus to scrape the Limitador operator metrics endpoint
+apiVersion: {{ include "rhcl.rbac.apiVersion" . }}
+kind: ClusterRole
+metadata:
+  name: limitador-operator-metrics-reader
+  labels:
+    {{- include "rhcl.labels" . | nindent 4 }}
+rules:
+  - nonResourceURLs: ["/metrics"]
+    verbs: [get]
+{{- end }}

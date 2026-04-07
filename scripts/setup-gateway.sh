@@ -165,14 +165,24 @@ spec:
       name: ${GATEWAY_NAME}-config
 EOF
 
-  # Wait for Gateway to be programmed
-  log_wait "Waiting for Gateway to be programmed..."
-  if kubectl wait --for=condition=Programmed gateway/"${GATEWAY_NAME}" -n "${KSERVE_NAMESPACE}" --timeout=120s; then
-    log_success "Gateway created and programmed: ${GATEWAY_NAME}"
+  # Wait for Gateway to be accepted (Programmed requires a LoadBalancer which
+  # is not available on KinD/minikube)
+  log_wait "Waiting for Gateway to be accepted..."
+  kubectl wait --for=condition=Accepted gateway/"${GATEWAY_NAME}" -n "${KSERVE_NAMESPACE}" --timeout=120s
+  log_success "Gateway accepted: ${GATEWAY_NAME}"
+
+  # Wait for Programmed (external IP) — skip on platforms without LoadBalancer
+  if kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -qE "^(kind|minikube)://"; then
+    log_info "Skipping Programmed check (no LoadBalancer on KinD/minikube)"
   else
-    log_error "Gateway failed to become programmed within timeout"
-    kubectl get gateway "${GATEWAY_NAME}" -n "${KSERVE_NAMESPACE}" -o yaml
-    return 1
+    log_wait "Waiting for Gateway to be programmed..."
+    if kubectl wait --for=condition=Programmed gateway/"${GATEWAY_NAME}" -n "${KSERVE_NAMESPACE}" --timeout=120s; then
+      log_success "Gateway programmed with external IP: ${GATEWAY_NAME}"
+    else
+      log_error "Gateway failed to become programmed within timeout"
+      kubectl get gateway "${GATEWAY_NAME}" -n "${KSERVE_NAMESPACE}" -o yaml
+      return 1
+    fi
   fi
 }
 

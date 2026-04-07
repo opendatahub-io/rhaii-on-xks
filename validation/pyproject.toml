@@ -26,7 +26,7 @@ dependencies = [
 "Bug Tracker" = "https://github.com/kwozyman/llmd-xks-preflight/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["llmd_xks_checks.py"]
+packages = ["llmd_xks_preflight.py"]
 
 [project.scripts]
-llmd-xks-preflight = "llmd_xks_checks:main"
+llmd-xks-preflight = "llmd_xks_preflight:main"

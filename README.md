@@ -1,8 +1,8 @@
-# Red Hat AI Inference on managed Kubernetes
+# Red Hat AI Inference Stack for Kubernetes
 
-Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLMInferenceService) on managed Kubernetes platforms (AKS, CoreWeave).
+Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLMInferenceService) on Kubernetes platforms (AKS, CoreWeave, OpenShift).
 
-> **Getting started?** See the [Deploying Red Hat AI Inference Server on Managed Kubernetes](./docs/deploying-llm-d-on-managed-kubernetes.md) guide for step-by-step deployment instructions.
+> **Getting started?** See the [Deploying on AKS/CoreWeave](./docs/deploying-llm-d-on-managed-kubernetes.md) guide or the [Deploying on OpenShift](./docs/deploying-on-openshift.md) guide for step-by-step deployment instructions.
 
 ## Related Repositories
 
@@ -15,23 +15,25 @@ Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLM
 | Component | App Version | Description |
 |-----------|-------------|-------------|
 | cert-manager-operator | 1.15.2 | TLS certificate management |
-| sail-operator (Istio) | 3.2.x | Gateway API for inference routing |
+| sail-operator (Istio) | 3.2.1 / 1.27.x | Gateway API for inference routing |
 | lws-operator | 1.0 | LeaderWorkerSet controller for multi-node workloads |
 | kserve | 3.4.0-ea.1 | KServe controller for LLMInferenceService lifecycle |
+| Gateway API | 1.4.0 | Standard Kubernetes ingress for inference routing (also compatible with 1.3.0+) |
+| rhcl (optional) | 1.2.0 | API gateway authentication, authorization, and rate limiting ([Kuadrant](https://kuadrant.io/)) |
 
 ### Version Compatibility
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| OSSM (Sail Operator) | 3.2.x | Gateway API for inference routing |
+| OSSM (Sail Operator) | 3.2.1 | Gateway API for inference routing |
 | Istio | v1.27.x | Service mesh |
 | InferencePool API | v1 | `inference.networking.k8s.io/v1` |
 | KServe | rhoai-3.4+ | LLMInferenceService controller |
 
 ## Prerequisites
 
-- Kubernetes cluster (AKS or CoreWeave) - see [llm-d-xks-aks](https://github.com/kwozyman/llm-d-xks-aks) for AKS provisioning
-- `kubectl`, `helm` (v3.17+), `helmfile`
+- Kubernetes cluster (AKS, CoreWeave, or OpenShift) - see [llm-d-xks-aks](https://github.com/kwozyman/llm-d-xks-aks) for AKS provisioning
+- [`kubectl`](https://kubernetes.io/docs/tasks/tools/) (1.33+), [`helm`](https://helm.sh/docs/intro/install/) (v3.17+), [`helmfile`](https://github.com/helmfile/helmfile#installation), `helm-diff` plugin
 - Red Hat account (for Sail Operator and vLLM images from `registry.redhat.io`)
 
 **Cluster readiness check (optional):** Run `cd validation && make container && make run` to verify cloud provider, GPU availability, and instance types before deploying. CRD checks will pass only after operators are deployed. See [Preflight Validation](./validation/README.md).
@@ -56,8 +58,14 @@ Username: {REGISTRY-SERVICE-ACCOUNT-USERNAME}
 Password: {REGISTRY-SERVICE-ACCOUNT-PASSWORD}
 Login Succeeded!
 
-# Verify it works
+# Verify it works (Sail Operator)
 $ podman pull registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle:3.2
+
+# Verify vLLM image access (CUDA)
+$ podman pull registry.redhat.io/rhaiis/vllm-cuda-rhel9
+
+# Verify vLLM image access (ROCm/AMD)
+$ podman pull registry.redhat.io/rhaiis/vllm-rocm-rhel9
 ```
 
 Then configure `values.yaml`:
@@ -128,9 +136,15 @@ make deploy-kserve       # Deploy KServe
 make undeploy            # Remove all infrastructure
 make undeploy-kserve     # Remove KServe
 
-# Test (ODH conformance)
-make test NAMESPACE=llm-d           # Run conformance tests
+# Test (conformance - auto-detects EA1/EA2)
+make test NAMESPACE=llm-inference   # Run conformance tests
 make test PROFILE=kserve-gpu        # With specific profile
+
+# Mock model (no GPU required)
+make deploy-mock-model                                    # Deploy mock LLMInferenceService
+MOCK_IMAGE=quay.io/myorg/vllm-mock:latest make deploy-mock-model  # Custom image
+make test NAMESPACE=mock-vllm-test                        # Test against mock
+make clean-mock-model                                     # Clean up mock
 
 # Other
 make status              # Show status
@@ -192,6 +206,10 @@ rhaii-on-xks/
 │   ├── sail-operator/            # Sail/Istio operator Helm chart
 │   ├── lws-operator/             # LWS operator Helm chart
 │   └── kserve/                   # KServe controller Helm chart (auto-generated)
+├── test/
+│   ├── conformance/              # Conformance tests (verify-llm-d-deployment.sh)
+│   ├── deploy-model.sh           # Deploy mock LLMInferenceService
+│   └── mock-vllm/                # Mock vLLM server (Dockerfile, server.py)
 ├── validation/                   # Preflight validation checks
 │   ├── llmd_xks_checks.py       # Validation script
 │   ├── Containerfile             # Container build

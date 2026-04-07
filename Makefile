@@ -1,9 +1,11 @@
 .PHONY: deploy deploy-all undeploy undeploy-kserve status help check-kubeconfig sync clear-cache
-.PHONY: deploy-cert-manager deploy-istio deploy-lws deploy-kserve deploy-opendatahub-prerequisites deploy-cert-manager-pki
-.PHONY: test conformance
+.PHONY: deploy-cert-manager deploy-istio deploy-lws deploy-rhcl deploy-kserve deploy-opendatahub-prerequisites deploy-cert-manager-pki
+.PHONY: undeploy-rhcl test conformance deploy-mock-model clean-mock-model
 
 HELMFILE_CACHE := $(HOME)/.cache/helmfile
-KSERVE_NAMESPACE ?= opendatahub
+# Auto-detect KServe namespace: redhat-ods-applications (EA2) or opendatahub (EA1)
+KSERVE_NAMESPACE ?= $(shell kubectl get deployment llmisvc-controller-manager -n redhat-ods-applications -o name 2>/dev/null | grep -q . && echo redhat-ods-applications || echo opendatahub)
+RHCL ?= false
 
 check-kubeconfig:
 	@kubectl cluster-info >/dev/null 2>&1 || (echo "ERROR: Cannot connect to cluster. Check KUBECONFIG." && exit 1)
@@ -14,11 +16,18 @@ help:
 	@echo "Deploy:"
 	@echo "  make deploy              - Deploy cert-manager + istio + lws"
 	@echo "  make deploy-all          - Deploy all (cert-manager + istio + lws + kserve)"
+	@echo "  make deploy-all RHCL=true - Deploy all including RHCL"
+	@echo "  make deploy-rhcl         - Deploy RHCL standalone (API gateway, auth, rate limiting)"
 	@echo "  make deploy-kserve       - Deploy KServe"
 	@echo ""
 	@echo "Undeploy:"
 	@echo "  make undeploy            - Remove all infrastructure"
+	@echo "  make undeploy-rhcl       - Remove RHCL"
 	@echo "  make undeploy-kserve     - Remove KServe"
+	@echo ""
+	@echo "Mock model (no GPU):"
+	@echo "  make deploy-mock-model   - Deploy mock LLMInferenceService"
+	@echo "  make clean-mock-model    - Clean up mock deployment"
 	@echo ""
 	@echo "Other:"
 	@echo "  make status              - Show deployment status"
@@ -42,7 +51,9 @@ deploy: check-kubeconfig clear-cache
 	helmfile apply --selector name=lws-operator
 	@$(MAKE) status
 
-deploy-all: check-kubeconfig deploy-cert-manager deploy-istio deploy-lws deploy-kserve
+RHCL_TARGET := $(if $(filter true,$(RHCL)),deploy-rhcl,)
+
+deploy-all: check-kubeconfig deploy-cert-manager deploy-istio deploy-lws $(RHCL_TARGET) deploy-kserve
 	@$(MAKE) status
 
 deploy-cert-manager: check-kubeconfig clear-cache
@@ -53,6 +64,21 @@ deploy-istio: check-kubeconfig clear-cache
 
 deploy-lws: check-kubeconfig clear-cache
 	helmfile apply --selector name=lws-operator
+
+deploy-rhcl: check-kubeconfig clear-cache
+	@echo "=== Deploying RHCL (Red Hat Connectivity Link) ==="
+	@echo "Prerequisites: cert-manager and sail-operator must be deployed first"
+	@kubectl get crd certificaterequests.cert-manager.io >/dev/null 2>&1 || \
+		(echo "ERROR: cert-manager not found. Run 'make deploy-cert-manager' first." && exit 1)
+	@kubectl get crd gateways.gateway.networking.k8s.io >/dev/null 2>&1 || \
+		(echo "ERROR: Gateway API CRDs not found. Run 'make deploy-istio' first." && exit 1)
+	helmfile apply --selector name=rhcl --state-values-set rhclOperator.enabled=true
+	@echo "=== RHCL deployed ==="
+
+undeploy-rhcl: check-kubeconfig
+	@echo "=== Removing RHCL ==="
+	-helmfile destroy --selector name=rhcl --state-values-set rhclOperator.enabled=true
+	@echo "=== RHCL removed ==="
 
 deploy-opendatahub-prerequisites: check-kubeconfig
 	@echo "=== Deploying OpenDataHub prerequisites ==="
@@ -120,6 +146,14 @@ status: check-kubeconfig
 	@echo "lws-operator:"
 	@kubectl get pods -n openshift-lws-operator 2>/dev/null || echo "  Not deployed"
 	@echo ""
+	@echo "rhcl (optional):"
+	@kubectl get pods -n kuadrant-operators 2>/dev/null || echo "  Not deployed (optional component)"
+	@if kubectl get namespace kuadrant-system >/dev/null 2>&1; then \
+		echo ""; \
+		echo "rhcl instances:"; \
+		kubectl get kuadrant,authorino,limitador -n kuadrant-system 2>/dev/null || echo "  No instances"; \
+	fi
+	@echo ""
 	@echo "kserve:"
 	@kubectl get pods -n $(KSERVE_NAMESPACE) -l control-plane=kserve-controller-manager 2>/dev/null || echo "  Not deployed"
 	@echo ""
@@ -148,14 +182,43 @@ status: check-kubeconfig
 		echo "Not installed"; \
 	fi
 	@echo -n "Istio version: "
-	@kubectl get istio default -n istio-system -o jsonpath='{.spec.version}' 2>/dev/null || echo "Not deployed"
+	@ISTIO_VER=$$(kubectl get istio -o jsonpath='{.items[0].spec.version}' 2>/dev/null); \
+		if [ -n "$$ISTIO_VER" ]; then echo "$$ISTIO_VER"; else echo "Not deployed"; fi
+	@echo -n "Istio status: "
+	@ISTIO_STATE=$$(kubectl get istio -o jsonpath='{.items[0].status.state}' 2>/dev/null); \
+		if [ -n "$$ISTIO_STATE" ]; then echo "$$ISTIO_STATE"; else echo "Not deployed"; fi
+	@echo ""
+	@echo -n "GatewayClass 'istio': "
+	@if kubectl get gatewayclass istio >/dev/null 2>&1; then \
+		echo "Available"; \
+	else \
+		ISTIO_STATUS=$$(kubectl get istio -o jsonpath='{.items[0].status.state}' 2>/dev/null); \
+		if [ "$$ISTIO_STATUS" = "ReconcileError" ]; then \
+			echo "NOT AVAILABLE (Istio has ReconcileError — check: kubectl get istio -A)"; \
+		else \
+			echo "NOT AVAILABLE (Istio may still be reconciling — check: kubectl get istio -A)"; \
+		fi; \
+	fi
 	@echo ""
 
 # Test/Conformance (ODH deployment validation)
-NAMESPACE ?= llm-d
+NAMESPACE ?= llm-inference
 PROFILE ?= kserve-basic
 
 test: conformance
 
 conformance: check-kubeconfig
-	@./test/conformance/verify-llm-d-deployment.sh --namespace $(NAMESPACE) --profile $(PROFILE)
+	@./test/conformance/verify-llm-d-deployment.sh --kserve --kserve-namespace $(KSERVE_NAMESPACE) --namespace $(NAMESPACE) --profile $(PROFILE)
+
+# Deploy/clean mock vLLM model (no GPU required)
+MOCK_NAMESPACE := mock-vllm-test
+
+deploy-mock-model: check-kubeconfig
+	@./test/deploy-model.sh
+
+clean-mock-model: check-kubeconfig
+	@echo "=== Cleaning up mock model deployment ==="
+	-kubectl delete llmisvc --all -n "$(MOCK_NAMESPACE)" --ignore-not-found
+	-kubectl delete clusterstoragecontainer local-noop --ignore-not-found 2>/dev/null || true
+	-kubectl delete namespace "$(MOCK_NAMESPACE)" --ignore-not-found
+	@echo "=== Done ==="

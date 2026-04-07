@@ -1,13 +1,12 @@
-ARG BASEIMAGE=registry.fedoraproject.org/fedora:latest
-FROM ${BASEIMAGE}
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
 
-RUN source /etc/os-release && \
-    if [ "${PLATFORM_ID}" == "platform:el9" ]; then dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm; fi && \
-    if [ "${PLATFORM_ID}" == "platform:el10" ]; then dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm; fi
+RUN microdnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
+    microdnf install -y python3 python3-configargparse python3-kubernetes && \
+    microdnf clean all
 
-RUN dnf install -y python3-configargparse python3-kubernetes python3-pip python3-build
+COPY llmd_xks_preflight.py /opt/llmd-xks-preflight/
 
-COPY . /root/src
-RUN python3 -m build /root/src -w -o /root/src && python3 -m pip install --no-deps /root/src/*.whl && rm -rf /root/src
+RUN useradd -r -u 1001 -g 0 preflight
+USER 1001
 
-ENTRYPOINT ["/usr/local/bin/llmd-xks-preflight"]
+ENTRYPOINT ["python3", "/opt/llmd-xks-preflight/llmd_xks_preflight.py"]

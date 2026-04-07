@@ -1,0 +1,137 @@
+# Test resources for RHCL integration test
+# Deploys a minimal Gateway + HTTPRoute + policies to validate the stack
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rhcl-test
+  labels:
+    app.kubernetes.io/part-of: rhcl-test
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rhcl-test-gateway
+  labels:
+    app.kubernetes.io/part-of: rhcl-test
+---
+# Simple echo server workload
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-server
+  namespace: rhcl-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo-server
+  template:
+    metadata:
+      labels:
+        app: echo-server
+    spec:
+      containers:
+        - name: echo
+          image: registry.k8s.io/e2e-test-images/agnhost:2.39
+          args: ["netexec", "--http-port=8080"]
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-server
+  namespace: rhcl-test
+spec:
+  selector:
+    app: echo-server
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+# Gateway
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: test-gateway
+  namespace: rhcl-test-gateway
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+# HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: echo-route
+  namespace: rhcl-test
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: test-gateway
+      namespace: rhcl-test-gateway
+  rules:
+    - backendRefs:
+        - name: echo-server
+          port: 8080
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+---
+# API key secrets for auth testing
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-api-key
+  namespace: kuadrant-system
+  labels:
+    authorino.kuadrant.io/managed-by: authorino
+stringData:
+  api_key: test-rhcl-key
+type: Opaque
+---
+# AuthPolicy targeting the HTTPRoute
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: echo-auth
+  namespace: rhcl-test
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: echo-route
+  rules:
+    authentication:
+      api-key-auth:
+        apiKey:
+          selector: {}
+        credentials:
+          queryString:
+            name: apikey
+---
+# RateLimitPolicy targeting the Gateway
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: test-ratelimit
+  namespace: rhcl-test-gateway
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: test-gateway
+  limits:
+    test-limit:
+      rates:
+        - limit: 5
+          window: 10s

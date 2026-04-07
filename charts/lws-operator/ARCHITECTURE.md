@@ -157,21 +157,9 @@ charts/lws-operator/
 ## Upgrade Process
 
 ```bash
-# Update to new bundle version
-./scripts/update-bundle.sh 1.1
-
-# Review changes
-git diff
+# (Optional) Update to a new bundle version
+./scripts/update-bundle.sh <version>
 
 # Deploy
-helmfile apply
+make deploy
 ```
-
-## Comparison with Other Operator Charts
-
-| Aspect | cert-manager | sail-operator | lws-operator |
-|--------|--------------|---------------|--------------|
-| Operand SAs | Fixed (3 known) | istiod + Gateway (dynamic) | Single (operator SA) |
-| SA namespaces | `cert-manager` | `istio-system` + user | `openshift-lws-operator` |
-| OpenShift API stubs | Infrastructure CRD | None | None |
-| Complexity | Medium | High | Low |

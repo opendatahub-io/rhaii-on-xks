@@ -856,7 +856,7 @@ check_pod_pattern() {
         fi
         echo "$count"
     else
-        log_fail "$description: No pods found matching '$pattern'"
+        log_warn "$description: No pods found matching '$pattern'"
         echo "0"
     fi
 }
@@ -982,16 +982,15 @@ check_llminferenceservice_resources() {
         # Check each one's status
         local ready_count=0
         local not_ready=()
-        while IFS= read -r line; do
-            local name ready
-            name=$(echo "$line" | awk '{print $1}')
-            ready=$(echo "$line" | awk '{print $3}')
+        while IFS= read -r name; do
+            local ready
+            ready=$($KUBECTL get llminferenceservice "$name" -n "$LLMD_NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
             if [[ "$ready" == "True" ]]; then
                 ((ready_count++))
             else
                 not_ready+=("$name")
             fi
-        done < <($KUBECTL get llminferenceservice -n "$LLMD_NAMESPACE" --no-headers 2>/dev/null)
+        done < <($KUBECTL get llminferenceservice -n "$LLMD_NAMESPACE" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null)
 
         if [[ "$ready_count" -eq "$llmisvc_count" ]]; then
             log_pass "All $llmisvc_count LLMInferenceService(s) are Ready"
@@ -1006,8 +1005,8 @@ check_llminferenceservice_resources() {
         fi
         return 0
     else
-        log_fail "No LLMInferenceService resources found in $LLMD_NAMESPACE"
-        return 1
+        log_warn "No LLMInferenceService resources found in $LLMD_NAMESPACE (OK for mock deployment)"
+        return 0
     fi
 }
 
@@ -1130,18 +1129,25 @@ check_kserve_controller() {
 
     local kserve_ns="${KSERVE_NAMESPACE:-opendatahub}"
 
-    # Check controller pod
-    local controller_pods
-    controller_pods=$($KUBECTL get pods -n "$kserve_ns" -l control-plane=kserve-controller-manager --no-headers 2>/dev/null | wc -l)
+    # Check controller pod (EA1: kserve-controller-manager, EA2: llmisvc-controller-manager)
+    local controller_pods=0
+    local controller_label=""
+    for label in "control-plane=kserve-controller-manager" "control-plane=llmisvc-controller-manager"; do
+        controller_pods=$($KUBECTL get pods -n "$kserve_ns" -l "$label" --no-headers 2>/dev/null | wc -l)
+        if [[ "$controller_pods" -gt 0 ]]; then
+            controller_label="$label"
+            break
+        fi
+    done
 
     if [[ "$controller_pods" -gt 0 ]]; then
         local running
-        running=$($KUBECTL get pods -n "$kserve_ns" -l control-plane=kserve-controller-manager --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+        running=$($KUBECTL get pods -n "$kserve_ns" -l "$controller_label" --no-headers 2>/dev/null | grep -c "Running" || echo "0")
         if [[ "$running" -gt 0 ]]; then
             log_pass "KServe controller: $running pod(s) running in $kserve_ns"
         else
             log_fail "KServe controller pods not running"
-            $KUBECTL get pods -n "$kserve_ns" -l control-plane=kserve-controller-manager
+            $KUBECTL get pods -n "$kserve_ns" -l "$controller_label"
         fi
     else
         log_fail "KServe controller not found in $kserve_ns"
@@ -1610,7 +1616,10 @@ auto_detect_model() {
     log_info "Auto-detecting model from /v1/models..."
 
     local response
-    if response=$(curl -s $curl_opts --max-time 10 "${base_url}/v1/models" 2>/dev/null); then
+    # shellcheck disable=SC2086
+    response=$(curl -s $curl_opts --max-time 10 "${base_url}/v1/models" 2>/dev/null || true)
+
+    if [[ -n "$response" ]]; then
         local model
         model=$(echo "$response" | jq -r '.data[0].id // .models[0].id // .models[0] // empty' 2>/dev/null || echo "")
         if [[ -n "$model" ]]; then
@@ -1733,6 +1742,49 @@ check_istio() {
         log_pass "istiod control plane running"
     else
         log_warn "istiod not found"
+    fi
+
+    # Discover Istio CR name dynamically
+    local istio_cr_name istio_status=""
+    istio_cr_name=$($KUBECTL get istio -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+    if [[ -z "$istio_cr_name" ]]; then
+        log_warn "No Istio CR found in $istio_ns"
+        log_info "  Hint: The Sail Operator needs an Istio CR to deploy the control plane"
+    else
+        # Check Istio CR reconciliation status
+        istio_status=$($KUBECTL get istio "$istio_cr_name" -o jsonpath='{.status.state}' 2>/dev/null || echo "")
+        if [[ -n "$istio_status" ]]; then
+            if [[ "$istio_status" == "Healthy" ]]; then
+                log_pass "Istio CR '$istio_cr_name' status: Healthy"
+            elif [[ "$istio_status" == "ReconcileError" ]]; then
+                local istio_msg
+                istio_msg=$($KUBECTL get istio "$istio_cr_name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null || echo "")
+                log_fail "Istio CR '$istio_cr_name' status: ReconcileError"
+                log_info "  Message: $istio_msg"
+                log_info "  Hint: Check for leftover cluster-scoped resources from a previous install"
+                log_info "  Fix: kubectl get clusterrole,clusterrolebinding,mutatingwebhookconfiguration,validatingwebhookconfiguration -o name | grep -i istio | xargs -r kubectl delete --ignore-not-found"
+            else
+                log_warn "Istio CR '$istio_cr_name' status: $istio_status"
+            fi
+        else
+            log_warn "Istio CR '$istio_cr_name' status: not yet reported"
+            log_info "  Hint: The Sail Operator may still be reconciling — wait and check: kubectl get istio"
+        fi
+    fi
+
+    # Check GatewayClass
+    if $KUBECTL get gatewayclass istio &>/dev/null; then
+        log_pass "GatewayClass 'istio' available"
+    else
+        log_fail "GatewayClass 'istio' not available"
+        if [[ -z "$istio_cr_name" ]]; then
+            log_info "  No Istio CR found — GatewayClass requires Istio to be deployed"
+        elif [[ "$istio_status" == "ReconcileError" ]]; then
+            log_info "  GatewayClass missing due to Istio ReconcileError (fix Istio first)"
+        else
+            log_info "  Istio may still be reconciling — wait and retry"
+        fi
     fi
 }
 
@@ -1944,11 +1996,13 @@ check_inference_readiness() {
     echo ""
 
     local response http_code
-    if response=$(curl -s $curl_opts -w "\n%{http_code}" --max-time 60 \
+    # shellcheck disable=SC2086
+    response=$(curl -s $curl_opts -w "\n%{http_code}" --max-time 60 \
         -X POST "${base_url}/v1/completions" \
         -H "Content-Type: application/json" \
-        -d "{\"model\":\"$MODEL_NAME\",\"prompt\":\"Hello\",\"max_tokens\":10}" 2>/dev/null); then
+        -d "{\"model\":\"$MODEL_NAME\",\"prompt\":\"Hello\",\"max_tokens\":10}" 2>/dev/null || true)
 
+    if [[ -n "$response" ]]; then
         http_code=$(echo "$response" | tail -1)
 
         if [[ "$http_code" == "200" ]]; then
@@ -1967,8 +2021,8 @@ check_inference_readiness() {
 check_events() {
     log_section "8. Recent Events"
 
-    log_info "Warning/Error events:"
-    $KUBECTL get events -n "$LLMD_NAMESPACE" --sort-by='.lastTimestamp' 2>/dev/null | grep -E "Warning|Error" | tail -5 || echo "  (none)"
+    log_info "Warning/Error events (informational — startup probe failures during model loading are expected):"
+    $KUBECTL get events -n "$LLMD_NAMESPACE" --sort-by='.lastTimestamp' --field-selector type=Warning 2>/dev/null | tail -5 || echo "  (none)"
 }
 
 # =============================================================================

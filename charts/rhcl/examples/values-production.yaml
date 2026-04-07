@@ -1,0 +1,116 @@
+# RHCL Production Configuration
+# Higher resources, GPU node avoidance (Azure), monitoring enabled
+# Limitador in-memory by default (add Redis config below if needed)
+
+platform:
+  type: openshift
+
+namespaces:
+  operators: kuadrant-operators
+  instances: kuadrant-system
+
+# Add your gateway namespace(s) here so wasm-plugin-pull-secret is created
+gatewayNamespaces:
+  - ingress-gateway
+
+operators:
+  kuadrant:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: sku
+              operator: NotIn
+              values: ["gpu"]
+
+  authorino:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: sku
+              operator: NotIn
+              values: ["gpu"]
+
+  limitador:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: sku
+              operator: NotIn
+              values: ["gpu"]
+
+  dns:
+    enabled: false
+    # Enable and provide cloud DNS credentials for multi-cluster DNS:
+    # enabled: true
+    # env:
+    #   - name: AWS_ACCESS_KEY_ID
+    #     valueFrom:
+    #       secretKeyRef:
+    #         name: dns-provider-credentials
+    #         key: aws-access-key-id
+
+instance:
+  kuadrant:
+    enabled: true
+    name: kuadrant
+
+rbac:
+  create: true
+
+monitoring:
+  enabled: true
+
+# Limitador storage configuration (production)
+# By default, Limitador uses in-memory storage. Rate limit counters are lost
+# on pod restart. For production, consider connecting to Redis:
+#
+# After deployment, patch the Limitador CR:
+#   kubectl patch limitador limitador -n kuadrant-system --type=merge -p '{
+#     "spec": {
+#       "storage": {
+#         "redis": {
+#           "configSecretRef": {
+#             "name": "limitador-redis-config"
+#           }
+#         }
+#       }
+#     }
+#   }'
+#
+# Create the Redis config secret first:
+#   kubectl create secret generic limitador-redis-config \
+#     -n kuadrant-system \
+#     --from-literal=URL=redis://redis.redis-system.svc:6379

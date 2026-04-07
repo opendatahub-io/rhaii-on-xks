@@ -7,7 +7,7 @@ Deploy Red Hat Leader Worker Set (LWS) Operator on any Kubernetes cluster withou
 This chart uses **olm-extractor** to extract manifests directly from Red Hat's OLM bundle, enabling deployment on non-OLM Kubernetes clusters (AKS, EKS, GKE) while:
 
 - **Minimizing OCP team burden** - Uses exact manifests from Red Hat's OLM bundles
-- **Easy upgrades** - Single command: `./scripts/update-bundle.sh <version>`
+- **Easy upgrades** - Update bundle with `./scripts/update-bundle.sh <version>`, then `make deploy`
 - **No breaking changes** - Only minimal patches for non-OLM environments
 
 ## What is Leader Worker Set?
@@ -74,6 +74,17 @@ Then in `environments/default.yaml`:
 ```yaml
 pullSecretFile: ~/pull-secret.txt
 ```
+
+### Values
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `namespace` | Operator namespace | `openshift-lws-operator` |
+| `bundle.version` | OLM bundle version | `1.0` |
+| `pullSecret.name` | Pull secret name | `redhat-pull-secret` |
+| `pullSecret.dockerConfigJson` | Docker config (set by helmfile) | `""` |
+| `lwsOperator.enabled` | Create LeaderWorkerSetOperator CR | `true` |
+| `lwsOperator.name` | LeaderWorkerSetOperator CR name | `cluster` |
 
 ## What Gets Deployed
 
@@ -150,11 +161,14 @@ EOF
 ./scripts/cleanup.sh
 ```
 
-## Update to New Bundle Version
+## Upgrade
 
 ```bash
-./scripts/update-bundle.sh 1.1
-helmfile apply
+# (Optional) Update to a new bundle version
+./scripts/update-bundle.sh <version>
+
+# Deploy
+make deploy
 ```
 
 ## Update Pull Secret
