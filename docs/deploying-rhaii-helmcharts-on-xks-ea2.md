@@ -178,6 +178,7 @@ azure:
     image: quay.io/rhoai/odh-rhel9-operator:rhoai-3.4-ea.2
 
 coreweave:
+  enabled: false
   cloudManager:
     image: quay.io/rhoai/odh-rhel9-operator:rhoai-3.4-ea.2
 
