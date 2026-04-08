@@ -156,7 +156,7 @@ The cloud manager orchestrates the following bootstrap sequence automatically:
 | Webhook certificate | Issued by cert-manager |
 | RHAI Operator | Starts (certificate volume mounted) |
 | Istio, LWS | Operators start |
-| KServe Controller | Deployed by RHAI Operator |
+| Serve LLMISvc Controller| Deployed by RHAI Operator |
 | All components | Running |
 
 > **Note:** The RHAI operator pods display `FailedMount` warnings during the first 60-90 seconds. This is expected behavior while cert-manager starts and issues the webhook certificate.
