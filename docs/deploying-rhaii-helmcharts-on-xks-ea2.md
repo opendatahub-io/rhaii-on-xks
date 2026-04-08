@@ -341,7 +341,7 @@ kubectl apply -f - <<'EOF'
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: inference-gateway
+  name: inference-gateway  # DO NOT CHANGE THIS VALUE
   namespace: redhat-ods-applications
 spec:
   gatewayClassName: istio
