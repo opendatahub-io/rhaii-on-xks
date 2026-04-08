@@ -74,8 +74,7 @@ RHAIIS images are hosted on `registry.redhat.io` and `quay.io/rhoai`. Both regis
 2. Verify the pull secret covers all required registries:
 
    ```bash
-   cat ~/pull-secret.json | python3 -c \
-     "import json,sys; d=json.load(sys.stdin); print('\n'.join(d.get('auths',{}).keys()))"
+   cat ~/pull-secret.json | jq -r '.auths | keys[]'
    # Should include: quay.io, registry.redhat.io
    ```
 
@@ -211,9 +210,9 @@ rhaiOperator:
     value: quay.io/rhoai/odh-llm-d-kv-cache-rhel9:rhoai-3.4-ea.2
 ```
 
-For CoreWeave, change `azure.enabled: true` to `azure.enabled: false` and add `coreweave.enabled: true`.
+> **Note:** vLLM images use `registry.redhat.io/rhaii-early-access/` with tag format `3.4.0-ea.2`. All other RHOAI images use `quay.io/rhoai/` with tag format `rhoai-3.4-ea.2`. These images will eventually be replaced with `registry.redhat.io` digest-pinned references.
 
-> **Note:** vLLM images use `registry.redhat.io/rhaii-early-access/` with tag format `3.4.0-ea.2`. All other RHOAI images use `quay.io/rhoai/` with tag format `rhoai-3.4-ea.2`.
+For CoreWeave, set `azure.enabled: false` and `coreweave.enabled: true`.
 
 ### 3.2 Install on Azure Kubernetes Service
 
@@ -237,7 +236,6 @@ helm upgrade rhaii oci://quay.io/rhoai/rhai-on-xks-chart \
 ```
 
 > **Important:** Do NOT use `--wait`. The chart uses post-install hook Jobs that need CRDs to register first, and the RHAI operator depends on cert-manager to start. Using `--wait` may cause the installation to time out.
-
 > **Important:** Always include `--set-file imagePullSecret.dockerConfigJson=...` in the initial install command. Running without it first and adding it later can cause image pull failures in dependency namespaces.
 
 ### 3.4 Verify Operator Deployment
@@ -295,7 +293,7 @@ kubectl get secret opendatahub-ca -n cert-manager \
   -o jsonpath='{.data.ca\.crt}' | base64 -d > /tmp/ca.crt
 
 # Create CA bundle ConfigMap
-kubectl create configmap odh-ca-bundle \
+kubectl create configmap rhaii-ca-bundle \
   --from-file=ca.crt=/tmp/ca.crt \
   -n redhat-ods-applications \
   --dry-run=client -o yaml | kubectl apply -f -
@@ -318,13 +316,13 @@ data:
       template:
         spec:
           volumes:
-          - name: odh-ca-bundle
+          - name: rhaii-ca-bundle
             configMap:
-              name: odh-ca-bundle
+              name: rhaii-ca-bundle
           containers:
           - name: istio-proxy
             volumeMounts:
-            - name: odh-ca-bundle
+            - name: rhaii-ca-bundle
               mountPath: /var/run/secrets/opendatahub
               readOnly: true
   service: |
@@ -430,8 +428,8 @@ spec:
         imagePullSecrets:
         - name: rhaii-pull-secret
         containers:
-        - name: main        # scheduler (EPP)
-        - name: tokenizer   # kv-cache / tokenizer sidecar
+        - name: main
+        - name: tokenizer
     route: {}
     gateway: {}
   template:
@@ -460,7 +458,7 @@ spec:
 EOF
 ```
 
-### 5.3 Monitor Deployment Progress
+### 5.4 Monitor Deployment Progress
 
 ```bash
 kubectl get llmisvc -n $NAMESPACE -w
@@ -612,7 +610,7 @@ kubectl logs deploy/istiod -n istio-system | grep gateway
 Ensure both ConfigMaps exist:
 
 ```bash
-kubectl get configmap inference-gateway-config odh-ca-bundle \
+kubectl get configmap inference-gateway-config rhaii-ca-bundle \
   -n redhat-ods-applications
 ```
 
@@ -637,8 +635,8 @@ router:
       imagePullSecrets:
       - name: rhaii-pull-secret
       containers:
-      - name: main        # scheduler (EPP)
-      - name: tokenizer   # kv-cache / tokenizer sidecar
+      - name: main
+      - name: tokenizer
 ```
 
 See the [conformance manifests](https://github.com/aneeshkp/llm-d-conformance-manifests/tree/3.4-ea2) for working examples.
@@ -704,23 +702,11 @@ kubectl delete crd llminferenceserviceconfigs.serving.kserve.io
 | `istio-system` | Cloud Manager | Istio control plane |
 | `openshift-lws-operator` | Cloud Manager | LeaderWorkerSet operator |
 
-### Image References
-
-| Component | Image |
-|-----------|-------|
-| RHAI Operator | `quay.io/rhoai/odh-rhel9-operator:rhoai-3.4-ea.2` |
-| KServe LLMISvc Controller | `quay.io/rhoai/odh-kserve-llmisvc-controller-rhel9:rhoai-3.4-ea.2` |
-| KServe Router | `quay.io/rhoai/odh-kserve-router-rhel9:rhoai-3.4-ea.2` |
-| EPP Scheduler | `quay.io/rhoai/odh-llm-d-inference-scheduler-rhel9:rhoai-3.4-ea.2` |
-| vLLM (CUDA) | `registry.redhat.io/rhaii-early-access/vllm-cuda-rhel9:3.4.0-ea.2` |
-| vLLM (ROCm) | `registry.redhat.io/rhaii-early-access/vllm-rocm-rhel9:3.4.0-ea.2` |
-| KV Cache / Tokenizer | `quay.io/rhoai/odh-llm-d-kv-cache-rhel9:rhoai-3.4-ea.2` |
-
 ### API Versions
 
 | API | Group | Version | Status |
 |-----|-------|---------|--------|
-| LLMInferenceService | `serving.kserve.io` | v1alpha1 / v1alpha2 | Alpha |
+| LLMInferenceService | `serving.kserve.io` | v1alpha2 | Alpha |
 | LLMInferenceServiceConfig | `serving.kserve.io` | v1alpha2 | Alpha |
 | InferencePool | `inference.networking.k8s.io` | v1 | GA |
 | Gateway | `gateway.networking.k8s.io` | v1 | GA |
