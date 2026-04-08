@@ -3,6 +3,8 @@
 Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLMInferenceService) on Kubernetes platforms (AKS, CoreWeave, OpenShift).
 
 > **Getting started?** See the [Deploying on AKS/CoreWeave](./docs/deploying-llm-d-on-managed-kubernetes.md) guide or the [Deploying on OpenShift](./docs/deploying-on-openshift.md) guide for step-by-step deployment instructions.
+>
+> **Using the RHAII Helm Chart (EA2)?** See the [Deploying with RHAII Helm Chart on xKS (EA2)](./docs/deploying-rhaii-helmcharts-on-xks-ea2.md) guide for operator-based deployment using `oci://quay.io/rhoai/rhai-on-xks-chart`.
 
 ## Related Repositories
 
