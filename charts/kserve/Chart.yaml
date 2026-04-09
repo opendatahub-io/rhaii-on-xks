@@ -1,6 +1,0 @@
-apiVersion: v2
-name: kserve-rhaii-xks
-description: KServe Red Hat AI Inference on xKS
-type: application
-version: 3.4.0-ea.2
-appVersion: "3.4.0-ea.2"

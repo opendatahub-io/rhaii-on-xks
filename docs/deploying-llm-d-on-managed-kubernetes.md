@@ -234,7 +234,7 @@ InferencePool API: v1 (inference.networking.k8s.io)
 Istio version: v1.27.5
 ```
 
-> **TLS Certificates:** The default configuration uses a self-signed CA for internal mTLS between inference components (router, scheduler, vLLM). This is sufficient for most deployments as the certificates are only used for pod-to-pod communication within the cluster. If your organization requires certificates issued by a corporate PKI, replace the `opendatahub-selfsigned-issuer` with a cert-manager ClusterIssuer backed by your CA (e.g., Vault, AWS ACM PCA, or an external PKI). See the [KServe Chart README - cert-manager PKI Setup](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/charts/kserve/README.md#cert-manager-pki-setup) for details. The KServe chart version is configured in `values.yaml` (`kserveChartVersion`). See the [KServe Chart README](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/charts/kserve/README.md) for chart details and cert-manager PKI prerequisites.
+> **TLS Certificates:** The default configuration uses a self-signed CA for internal mTLS between inference components (router, scheduler, vLLM). This is sufficient for most deployments as the certificates are only used for pod-to-pod communication within the cluster. If your organization requires certificates issued by a corporate PKI, replace the `opendatahub-selfsigned-issuer` with a cert-manager ClusterIssuer backed by your CA (e.g., Vault, AWS ACM PCA, or an external PKI). See [`manifests/pki-prereq.yaml`](../manifests/pki-prereq.yaml) for the default PKI resources. The KServe chart version is configured in `values.yaml` (`kserveChartVersion`).
 
 ---
 
@@ -702,7 +702,7 @@ make deploy-kserve
 | Sail Operator (Istio) | 3.2.1 | `registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle:3.2` |
 | Istio | 1.27.x | Dynamic resolution via `v1.27-latest` |
 | LeaderWorkerSet | 1.0 | `registry.k8s.io/lws/lws-controller` |
-| KServe Controller | 0.17 (chart 3.4.0-ea.2) | `registry.redhat.io` (via `charts/kserve/`) |
+| KServe Controller | 0.15 (chart 3.4.0-ea.1) | `registry.redhat.io` (via `ghcr.io/opendatahub-io/kserve-rhaii-xks`) |
 | Gateway API | 1.4.0 | Also compatible with 1.3.0+ |
 | vLLM (CUDA) | 3.4.0-ea.2 | `registry.redhat.io/rhaiis/vllm-cuda-rhel9` |
 | vLLM (ROCm) | 3.4.0-ea.2 | `registry.redhat.io/rhaiis/vllm-rocm-rhel9` |
@@ -724,7 +724,7 @@ For assistance with Red Hat AI Inference Server deployments, contact Red Hat Sup
 
 **Additional Resources:**
 
-* [KServe Chart README](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/charts/kserve/README.md) - KServe Helm chart details, PKI prerequisites, and OCI registry install
+* [PKI Prerequisites](../manifests/pki-prereq.yaml) - cert-manager PKI resources for KServe mTLS
 * [Preflight Validation](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/validation/README.md) - Cluster readiness and post-deployment validation checks
 * [Monitoring Setup Guide](../monitoring-stack/) - Optional Prometheus/Grafana configuration for dashboards and autoscaling
 * [KServe LLMInferenceService Samples](https://github.com/red-hat-data-services/kserve/tree/rhoai-3.4/docs/samples/llmisvc)
