@@ -10,6 +10,7 @@ metadata:
 spec:
   selector:
     app.kubernetes.io/name: maas-api
+    app.kubernetes.io/component: api
   ports:
   - name: http
     port: 8080

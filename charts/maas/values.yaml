@@ -57,14 +57,22 @@ gateway:
       enabled: false
       port: 443
 
-# PostgreSQL (dev instance for API key storage)
+# PostgreSQL for API key and subscription storage
 postgresql:
   enabled: true
   image:
     repository: registry.redhat.io/rhel9/postgresql-15
     tag: latest
   database: maas
-  storage: emptyDir
+  auth:
+    username: maas
+    password: ""         # Set via --set or external secret. Auto-generated if empty.
+    existingSecret: ""   # Use an existing Secret instead of creating one (key: POSTGRESQL_PASSWORD)
+  storage:
+    type: emptyDir       # emptyDir (dev) or persistentVolumeClaim (production)
+    pvc:
+      size: 1Gi
+      storageClassName: ""  # Uses cluster default if empty
   resources:
     requests:
       memory: "256Mi"
@@ -82,11 +90,6 @@ azureAD:
   # Admin group for maas-api access control (Azure AD group object ID)
   # Only members of this group can create subscriptions and API keys
   adminGroup: ""     # e.g., "maas-admins" or a group object ID
-  # Per-user rate limit across all API keys (0 = disabled)
-  perUserRateLimit:
-    enabled: false
-    limit: 500
-    window: 1h
 
 # Tier mapping for rate limiting
 tierMapping:

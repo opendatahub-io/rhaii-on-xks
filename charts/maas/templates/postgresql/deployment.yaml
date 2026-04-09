@@ -1,4 +1,24 @@
 {{- if .Values.postgresql.enabled }}
+{{- if eq (.Values.postgresql.storage.type | default "emptyDir") "persistentVolumeClaim" }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: {{ include "maas.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.storage.pvc.size | default "1Gi" }}
+  {{- if .Values.postgresql.storage.pvc.storageClassName }}
+  storageClassName: {{ .Values.postgresql.storage.pvc.storageClassName }}
+  {{- end }}
+---
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,6 +33,10 @@ spec:
   selector:
     matchLabels:
       app: postgres
+  {{- if eq (.Values.postgresql.storage.type | default "emptyDir") "persistentVolumeClaim" }}
+  strategy:
+    type: Recreate
+  {{- end }}
   template:
     metadata:
       labels:
@@ -24,6 +48,8 @@ spec:
       imagePullSecrets:
       - name: {{ .Values.pullSecret.name }}
       {{- end }}
+      securityContext:
+        runAsNonRoot: true
       containers:
       - name: postgresql
         image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
@@ -35,17 +61,17 @@ spec:
         - name: POSTGRESQL_USER
           valueFrom:
             secretKeyRef:
-              name: postgres-creds
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgres-creds" }}
               key: POSTGRESQL_USER
         - name: POSTGRESQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: postgres-creds
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgres-creds" }}
               key: POSTGRESQL_PASSWORD
         - name: POSTGRESQL_DATABASE
           valueFrom:
             secretKeyRef:
-              name: postgres-creds
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgres-creds" }}
               key: POSTGRESQL_DATABASE
         resources:
           {{- toYaml .Values.postgresql.resources | nindent 10 }}
@@ -57,7 +83,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - pg_isready -U maas -d {{ .Values.postgresql.database }}
+            - pg_isready -U $(POSTGRESQL_USER) -d {{ .Values.postgresql.database }}
           initialDelaySeconds: 10
           periodSeconds: 5
         livenessProbe:
@@ -65,12 +91,21 @@ spec:
             command:
             - /bin/sh
             - -c
-            - pg_isready -U maas -d {{ .Values.postgresql.database }}
+            - pg_isready -U $(POSTGRESQL_USER) -d {{ .Values.postgresql.database }}
           initialDelaySeconds: 30
           periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
       volumes:
       - name: pgdata
+        {{- if eq (.Values.postgresql.storage.type | default "emptyDir") "persistentVolumeClaim" }}
+        persistentVolumeClaim:
+          claimName: postgres-data
+        {{- else }}
         emptyDir: {}
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service

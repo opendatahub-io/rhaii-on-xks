@@ -1,3 +1,9 @@
+{{- if and .Values.azureAD.enabled (not .Values.azureAD.tenantId) }}
+  {{- fail "azureAD.tenantId is required when azureAD.enabled is true" }}
+{{- end }}
+{{- if and .Values.azureAD.enabled (not .Values.azureAD.clientId) }}
+  {{- fail "azureAD.clientId is required when azureAD.enabled is true" }}
+{{- end }}
 apiVersion: kuadrant.io/v1
 kind: AuthPolicy
 metadata:
@@ -6,7 +12,6 @@ metadata:
   labels:
     {{- include "maas.labels" . | nindent 4 }}
     app.kubernetes.io/component: default-policy
-    app.kubernetes.io/managed-by: maas-controller
 spec:
   targetRef:
     group: gateway.networking.k8s.io
