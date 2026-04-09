@@ -6,7 +6,7 @@
 #
 # Options:
 #   --overlay PATH              Path to Kustomize overlay (required)
-#   --tag TAG                   Image tag for quay.io replacements (default: 3.4.0-ea.2)
+#   --tag TAG                   Image tag for quay.io replacements (default: 3.4.0-ea.1)
 #   --branch BRANCH             RHOAI-Build-Config branch for image mappings (default: rhoai-3.4)
 #   --skip-image-replacement    Skip image replacement (use original images from overlay)
 #   --help                      Show this help message
@@ -21,7 +21,7 @@ CHART_DIR="${SCRIPT_DIR}"
 FILES_DIR="${CHART_DIR}/files"
 
 # Defaults
-TAG="3.4.0-ea.2"
+TAG="3.4.0-ea.1"
 BRANCH="rhoai-3.4"
 KUSTOMIZE_OVERLAY=""
 SKIP_IMAGE_REPLACEMENT="false"
@@ -93,9 +93,9 @@ KSERVE_ROOT=$(dirname "$(dirname "$(dirname "${KUSTOMIZE_OVERLAY}")")")
 # Copy LLM CRDs to crds/ directory (Helm installs these first automatically)
 echo "Copying CRDs to crds/ directory..."
 CRD_FILES=(
-    "config/crd/full/llmisvc/serving.kserve.io_llminferenceservices.yaml"
-    "config/crd/full/llmisvc/serving.kserve.io_llminferenceserviceconfigs.yaml"
-    "config/llmisvc/gateway-inference-extension.yaml"
+    "config/crd/full/serving.kserve.io_llminferenceservices.yaml"
+    "config/crd/full/serving.kserve.io_llminferenceserviceconfigs.yaml"
+    "config/crd/external/gateway-inference-extension/gateway-inference-extension.yaml"
 )
 
 for crd in "${CRD_FILES[@]}"; do
@@ -130,17 +130,6 @@ yq eval 'select(.kind != "ValidatingWebhookConfiguration" and .kind != "Mutating
     "${FILES_DIR}/resources-all.yaml" > "${FILES_DIR}/resources.yaml"
 
 rm -f "${TEMP_BUILD}" "${FILES_DIR}/resources-all.yaml"
-
-# Patch: add runAsUser to llmisvc-controller-manager deployment
-# UBI-based images don't set USER in Dockerfile, so non-OpenShift clusters
-# (which lack SCC to inject a UID) will fail the runAsNonRoot check without this.
-# TODO(RHOAIENG-56701): remove this patch once the image build sets USER 1000
-# https://redhat.atlassian.net/browse/RHOAIENG-56701
-echo "Patching llmisvc-controller-manager securityContext (runAsUser: 1000)..."
-yq eval '
-  (select(.kind == "Deployment" and .metadata.name == "llmisvc-controller-manager")
-    .spec.template.spec.securityContext.runAsUser) = 1000
-' -i "${FILES_DIR}/resources.yaml"
 
 if [[ "${SKIP_IMAGE_REPLACEMENT}" == "true" ]]; then
     echo ""
@@ -177,13 +166,13 @@ done < <(echo "${CSV_CONTENT}" | grep -oE 'registry\.redhat\.io/[^@"[:space:]]+@
 
 echo "  Found ${#IMAGE_MAP[@]} image mappings"
 
-# Step 2: Replace quay.io/opendatahub and ghcr.io images with registry.redhat.io + TAG
-echo "Replacing upstream images (using tag: ${TAG})..."
+# Step 2: Replace quay.io/opendatahub images with registry.redhat.io + TAG
+echo "Replacing quay.io images (using tag: ${TAG})..."
 
-UPSTREAM_IMAGES=$(grep -oE '(quay\.io/opendatahub|ghcr\.io/opendatahub-io/[^/]+)/[^@:"'\''[:space:]]+' "${FILES_DIR}/resources.yaml" | sort -u)
+QUAY_IMAGES=$(grep -oE 'quay\.io/opendatahub/[^@:"'\''[:space:]]+' "${FILES_DIR}/resources.yaml" | sort -u)
 
-for upstream_repo in ${UPSTREAM_IMAGES}; do
-    component=$(basename "${upstream_repo}")
+for quay_repo in ${QUAY_IMAGES}; do
+    component=$(basename "${quay_repo}")
 
     # Find target repo (without SHA) from CSV - match any rhel version
     target_repo=$(echo "${CSV_CONTENT}" | grep -oE "registry\.redhat\.io/rhoai/odh-${component}-rhel[0-9]+" | head -1 || true)
@@ -197,11 +186,11 @@ for upstream_repo in ${UPSTREAM_IMAGES}; do
     fi
 
     if [[ -n "${target_repo}" ]]; then
-        upstream_repo_escaped="${upstream_repo//./\\.}"
-        sed -i -E "s#${upstream_repo_escaped}(:[^\"[:space:]]+|@sha256:[a-f0-9]+)?#${target_repo}:${TAG}#g" "${FILES_DIR}/resources.yaml"
-        echo "  ${upstream_repo} -> ${target_repo}:${TAG}"
+        quay_repo_escaped="${quay_repo//./\\.}"
+        sed -i -E "s#${quay_repo_escaped}(:[^\"[:space:]]+|@sha256:[a-f0-9]+)?#${target_repo}:${TAG}#g" "${FILES_DIR}/resources.yaml"
+        echo "  ${quay_repo} -> ${target_repo}:${TAG}"
     else
-        echo "  WARNING: No mapping found for ${upstream_repo}"
+        echo "  WARNING: No mapping found for ${quay_repo}"
     fi
 done
 

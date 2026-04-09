@@ -5,7 +5,6 @@
 #   helmfile apply --selector name=cert-manager-operator  # Deploy only cert-manager
 #   helmfile apply --selector name=sail-operator          # Deploy only istio
 #   helmfile apply --selector name=lws-operator           # Deploy only lws
-#   helmfile apply --selector name=rhcl                   # Deploy only RHCL (requires rhclOperator.enabled: true)
 #   helmfile sync  --selector name=kserve-rhaii-xks        # Deploy only Kserve
 #   helmfile destroy                                      # Remove all
 
@@ -40,26 +39,10 @@ helmfiles:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 
-  # rhcl (Red Hat Connectivity Link) - optional API gateway, auth, rate limiting
-{{- if hasKey .Values "rhclOperator" }}
-{{- if .Values.rhclOperator.enabled }}
-  - path: charts/rhcl/helmfile.yaml.gotmpl
-    selectorsInherited: true
-    values:
-      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth }}
-      - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
-{{- if and (hasKey .Values.rhclOperator "operators") (hasKey .Values.rhclOperator.operators "dns") }}
-      - operators:
-          dns:
-            enabled: {{ .Values.rhclOperator.operators.dns.enabled | default false }}
-{{- end }}
-{{- end }}
-{{- end }}
-
 ---
 
 {{ $kserveChart := "oci://ghcr.io/opendatahub-io/kserve-rhaii-xks" }}
-{{ $kserveVersion := .Values.kserveChartVersion | default "3.4.0-ea.2-dev-37529e9" }}
+{{ $kserveVersion := .Values.kserveChartVersion | default "3.4.0-ea.1-dev-8a30e66" }}
 
 releases:
   - name: kserve-rhaii-xks

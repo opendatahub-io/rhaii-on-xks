@@ -27,17 +27,9 @@ sailOperator:
 lwsOperator:
   enabled: true
 
-# rhcl (Red Hat Connectivity Link) - optional API gateway, auth, rate limiting
-# Set to true to deploy RHCL operators (Kuadrant, Authorino, Limitador)
-rhclOperator:
-  enabled: false
-  operators:
-    dns:
-      enabled: false
-
 # =============================================================================
 # KServe
 # =============================================================================
 
 # KServe OCI chart version (dev variant until official builds are on registry.redhat.io)
-kserveChartVersion: "3.4.0-ea.2-dev-37529e9"
+kserveChartVersion: "3.4.0-ea.1-dev-8a30e66"
