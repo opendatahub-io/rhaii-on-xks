@@ -206,8 +206,9 @@ rhaii-on-xks/
 ├── charts/
 │   ├── cert-manager-operator/    # cert-manager operator Helm chart
 │   ├── sail-operator/            # Sail/Istio operator Helm chart
-│   ├── lws-operator/             # LWS operator Helm chart
-│   └── kserve/                   # KServe controller Helm chart (auto-generated)
+│   └── lws-operator/             # LWS operator Helm chart
+├── manifests/
+│   └── pki-prereq.yaml           # cert-manager PKI resources for KServe TLS
 ├── test/
 │   ├── conformance/              # Conformance tests (verify-llm-d-deployment.sh)
 │   ├── deploy-model.sh           # Deploy mock LLMInferenceService
@@ -228,6 +229,5 @@ Helm charts are included locally under `charts/`:
 - `charts/cert-manager-operator/` — cert-manager operator
 - `charts/sail-operator/` — Sail/Istio operator
 - `charts/lws-operator/` — LeaderWorkerSet operator
-- `charts/kserve/` — KServe controller (auto-generated from Kustomize overlays, all images from `registry.redhat.io`)
 
-The helmfile imports the infrastructure charts (cert-manager, sail-operator, lws-operator) including presync hooks for CRD installation. The KServe OCI chart is deployed via helmfile from `ghcr.io/opendatahub-io/kserve-rhaii-xks`.
+The helmfile imports the infrastructure charts (cert-manager, sail-operator, lws-operator) including presync hooks for CRD installation. The KServe chart is consumed as a pre-built OCI artifact from `ghcr.io/opendatahub-io/kserve-rhaii-xks`.

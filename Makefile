@@ -96,7 +96,7 @@ deploy-cert-manager-pki: check-kubeconfig deploy-opendatahub-prerequisites
 	kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=120s
 	@echo "Waiting for webhook CA bundle to propagate..."
 	@for i in 1 2 3 4 5 6 7 8 9 10 11 12; do \
-		if kubectl apply --dry-run=server -f ./charts/kserve/pki-prereq.yaml >/dev/null 2>&1; then \
+		if kubectl apply --dry-run=server -f ./manifests/pki-prereq.yaml >/dev/null 2>&1; then \
 			echo "  Webhook ready"; \
 			break; \
 		fi; \
@@ -107,7 +107,7 @@ deploy-cert-manager-pki: check-kubeconfig deploy-opendatahub-prerequisites
 		echo "  Webhook not ready yet, retrying in 10s... ($$i/12)"; \
 		sleep 10; \
 	done
-	kubectl apply -f ./charts/kserve/pki-prereq.yaml
+	kubectl apply -f ./manifests/pki-prereq.yaml
 	kubectl wait --for=condition=Ready clusterissuer/opendatahub-ca-issuer --timeout=120s
 
 deploy-kserve: check-kubeconfig deploy-cert-manager-pki
