@@ -208,7 +208,7 @@ rhaii-on-xks/
 │   ├── sail-operator/            # Sail/Istio operator Helm chart
 │   └── lws-operator/             # LWS operator Helm chart
 ├── manifests/
-│   └── pki-prereq.yaml           # cert-manager PKI resources for KServe mTLS
+│   └── pki-prereq.yaml           # cert-manager PKI resources for KServe TLS
 ├── test/
 │   ├── conformance/              # Conformance tests (verify-llm-d-deployment.sh)
 │   ├── deploy-model.sh           # Deploy mock LLMInferenceService
