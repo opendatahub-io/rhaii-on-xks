@@ -724,7 +724,7 @@ For assistance with Red Hat AI Inference Server deployments, contact Red Hat Sup
 
 **Additional Resources:**
 
-* [PKI Prerequisites](../manifests/pki-prereq.yaml) - cert-manager PKI resources for KServe mTLS
+* [PKI Prerequisites](../manifests/pki-prereq.yaml) - cert-manager PKI resources for KServe TLS
 * [Preflight Validation](https://github.com/opendatahub-io/rhaii-on-xks/blob/main/validation/README.md) - Cluster readiness and post-deployment validation checks
 * [Monitoring Setup Guide](../monitoring-stack/) - Optional Prometheus/Grafana configuration for dashboards and autoscaling
 * [KServe LLMInferenceService Samples](https://github.com/red-hat-data-services/kserve/tree/rhoai-3.4/docs/samples/llmisvc)
