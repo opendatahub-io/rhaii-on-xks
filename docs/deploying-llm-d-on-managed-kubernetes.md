@@ -234,7 +234,7 @@ InferencePool API: v1 (inference.networking.k8s.io)
 Istio version: v1.27.5
 ```
 
-> **TLS Certificates:** The default configuration uses a self-signed CA for internal mTLS between inference components (router, scheduler, vLLM). This is sufficient for most deployments as the certificates are only used for pod-to-pod communication within the cluster. If your organization requires certificates issued by a corporate PKI, replace the `opendatahub-selfsigned-issuer` with a cert-manager ClusterIssuer backed by your CA (e.g., Vault, AWS ACM PCA, or an external PKI). See [`manifests/pki-prereq.yaml`](../manifests/pki-prereq.yaml) for the default PKI resources. The KServe chart version is configured in `values.yaml` (`kserveChartVersion`).
+> **TLS Certificates:** The default configuration uses a self-signed CA for internal TLS between inference components (router, scheduler, vLLM). This is sufficient for most deployments as the certificates are only used for pod-to-pod communication within the cluster. If your organization requires certificates issued by a corporate PKI, replace the `opendatahub-selfsigned-issuer` with a cert-manager ClusterIssuer backed by your CA (e.g., Vault, AWS ACM PCA, or an external PKI). See [`manifests/pki-prereq.yaml`](../manifests/pki-prereq.yaml) for the default PKI resources. The KServe chart version is configured in `values.yaml` (`kserveChartVersion`).
 
 ---
 
