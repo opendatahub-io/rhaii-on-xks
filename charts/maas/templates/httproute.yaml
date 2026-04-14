@@ -24,7 +24,7 @@ spec:
     backendRefs:
     - name: maas-api
       namespace: {{ include "maas.namespace" . }}
-      port: 8080
+      port: {{ if .Values.maasApi.tls.enabled }}8443{{ else }}8080{{ end }}
   - matches:
     - path:
         type: PathPrefix
@@ -32,4 +32,4 @@ spec:
     backendRefs:
     - name: maas-api
       namespace: {{ include "maas.namespace" . }}
-      port: 8080
+      port: {{ if .Values.maasApi.tls.enabled }}8443{{ else }}8080{{ end }}

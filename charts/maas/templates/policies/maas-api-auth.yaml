@@ -32,9 +32,15 @@ spec:
         headers:
           x-maas-username:
             plain:
-              value: "true"
+{{- if .Values.azureAD.enabled }}
               selector: auth.identity.preferred_username
+{{- else }}
+              value: anonymous
+{{- end }}
           x-maas-group:
             plain:
-              value: "true"
+{{- if .Values.azureAD.enabled }}
               selector: auth.identity.groups
+{{- else }}
+              expression: '"[\"system:authenticated\"]"'
+{{- end }}

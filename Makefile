@@ -1,7 +1,7 @@
 .PHONY: deploy deploy-all undeploy undeploy-kserve status help check-kubeconfig sync clear-cache
 .PHONY: deploy-cert-manager deploy-istio deploy-lws deploy-rhcl deploy-kserve deploy-opendatahub-prerequisites deploy-cert-manager-pki
 .PHONY: undeploy-rhcl deploy-maas undeploy-maas test conformance deploy-mock-model clean-mock-model lint
-.PHONY: demo-setup demo-run demo-cleanup demo-all
+.PHONY: demo-setup demo-run demo-cleanup demo-all setup-maas-tls
 
 HELMFILE_CACHE := $(HOME)/.cache/helmfile
 # Auto-detect KServe namespace: redhat-ods-applications (EA2) or opendatahub (EA1)
@@ -24,6 +24,7 @@ help:
 	@echo "  make deploy-all RHCL=true MAAS=true - Deploy all including RHCL + MaaS"
 	@echo "  make deploy-rhcl         - Deploy RHCL standalone (API gateway, auth, rate limiting)"
 	@echo "  make deploy-maas         - Deploy MaaS (API gateway, auth, rate limiting, subscriptions)"
+	@echo "  make setup-maas-tls      - Setup TLS cert chain for MaaS (Authorino CA trust)"
 	@echo "  make deploy-kserve       - Deploy KServe"
 	@echo ""
 	@echo "Undeploy:"
@@ -125,7 +126,13 @@ deploy-maas: check-kubeconfig clear-cache
 	@kubectl get kuadrant -n kuadrant-system -o name 2>/dev/null | grep -q . || \
 		(echo "ERROR: No Kuadrant instance found in kuadrant-system. Run 'make deploy-rhcl' first." && exit 1)
 	helmfile apply --selector name=maas --state-values-set maas.enabled=true
+	@echo "=== Running MaaS TLS setup (Authorino CA trust) ==="
+	@./scripts/setup-maas-tls.sh
 	@echo "=== MaaS deployed ==="
+
+setup-maas-tls: check-kubeconfig
+	@echo "=== Setting up MaaS TLS (cert chain + Authorino CA trust) ==="
+	@./scripts/setup-maas-tls.sh
 
 undeploy-maas: check-kubeconfig
 	@echo "=== Removing MaaS ==="

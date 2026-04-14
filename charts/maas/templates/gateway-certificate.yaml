@@ -1,0 +1,37 @@
+{{- if .Values.gateway.listeners.https.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: maas-gateway-tls
+  namespace: {{ include "maas.gateway.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  secretName: maas-gateway-tls
+  duration: 8760h    # 1 year
+  renewBefore: 720h  # 30 days
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - server auth
+  dnsNames:
+    - {{ .Values.gateway.hostname | replace "*." "" | quote }}
+    - {{ .Values.gateway.hostname | quote }}
+    {{- if .Values.gateway.listeners.https.extraDnsNames }}
+    {{- range .Values.gateway.listeners.https.extraDnsNames }}
+    - {{ . | quote }}
+    {{- end }}
+    {{- end }}
+  {{- if .Values.gateway.listeners.https.ipAddresses }}
+  ipAddresses:
+    {{- range .Values.gateway.listeners.https.ipAddresses }}
+    - {{ . }}
+    {{- end }}
+  {{- end }}
+  issuerRef:
+    name: {{ .Values.gateway.listeners.https.issuerRef.name | default "opendatahub-ca-issuer" }}
+    kind: {{ .Values.gateway.listeners.https.issuerRef.kind | default "ClusterIssuer" }}
+    group: cert-manager.io
+{{- end }}

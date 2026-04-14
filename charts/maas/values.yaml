@@ -23,9 +23,16 @@ maasApi:
     limits:
       memory: "128Mi"
       cpu: "200m"
-  secure: "false"
   subscriptionNamespace: "models-as-a-service"
   apiKeyMaxExpirationDays: "30"
+  # TLS configuration for maas-api (required for MaaSAuthPolicy to work)
+  # cert-manager issues a certificate signed by opendatahub-ca-issuer,
+  # which Authorino must also trust (see scripts/setup-maas-tls.sh)
+  tls:
+    enabled: true
+    issuerRef:
+      name: opendatahub-ca-issuer
+      kind: ClusterIssuer
 
 # MaaS Controller
 maasController:
@@ -54,8 +61,13 @@ gateway:
     http:
       port: 80
     https:
-      enabled: false
+      enabled: true
       port: 443
+      issuerRef:
+        name: opendatahub-ca-issuer
+        kind: ClusterIssuer
+      extraDnsNames: []    # e.g., ["maas.example.com"]
+      ipAddresses: []      # e.g., ["20.xx.xx.xx"] — set to gateway external IP for curl without DNS
 
 # PostgreSQL for API key and subscription storage
 postgresql:

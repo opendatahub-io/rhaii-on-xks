@@ -95,6 +95,23 @@ releases:
             echo "Waiting for maas-api..."
             kubectl rollout status deployment/maas-api -n "$NAMESPACE" --timeout=120s 2>/dev/null || { echo "ERROR: maas-api not ready"; ERRORS=$((ERRORS+1)); }
 
+{{- if not (eq (index .Values "maasApiTlsEnabled" | default "true" | toString) "false") }}
+            echo "Waiting for maas-api TLS certificate..."
+            for i in $(seq 1 30); do
+              CERT_READY=$(kubectl get certificate maas-api-serving-cert -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+              if [ "$CERT_READY" = "True" ]; then
+                echo "  maas-api-serving-cert is Ready"
+                break
+              fi
+              echo "  Waiting for cert-manager to issue certificate... ($i/30)"
+              sleep 5
+            done
+            if [ "$CERT_READY" != "True" ]; then
+              echo "ERROR: maas-api-serving-cert not ready after 150s"
+              ERRORS=$((ERRORS+1))
+            fi
+{{- end }}
+
             GATEWAY_NS="{{ .Values.gatewayNamespace | default "istio-system" }}"
             GATEWAY_NAME="{{ .Values.gatewayName | default "maas-default-gateway" }}"
             echo "Checking MaaS gateway..."

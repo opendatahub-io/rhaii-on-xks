@@ -28,7 +28,7 @@ spec:
         matchLabels:
           authorino-resource: authorino
     ports:
-    - port: 8080
+    - port: {{ if .Values.maasApi.tls.enabled }}8443{{ else }}8080{{ end }}
       protocol: TCP
   # Istio gateway proxy traffic
   - from:
@@ -39,7 +39,7 @@ spec:
         matchLabels:
           istio.io/gateway-name: {{ include "maas.gateway.name" . }}
     ports:
-    - port: 8080
+    - port: {{ if .Values.maasApi.tls.enabled }}8443{{ else }}8080{{ end }}
       protocol: TCP
   # Istio sidecar health checks and inter-pod mesh traffic
   - from:

@@ -1,0 +1,23 @@
+{{- if .Values.maasApi.tls.enabled }}
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: maas-api-tls
+  namespace: {{ include "maas.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  host: maas-api.{{ include "maas.namespace" . }}.svc.cluster.local
+  trafficPolicy:
+    portLevelSettings:
+    - port:
+        number: 8443
+      tls:
+        mode: SIMPLE
+        # insecureSkipVerify is used because the gateway Envoy cannot load
+        # the opendatahub-ca via SDS for DestinationRule CA verification.
+        # Authorino verifies maas-api's cert properly (patched trust store).
+        # For production with external CAs, replace with caCertificates.
+        insecureSkipVerify: true
+{{- end }}
