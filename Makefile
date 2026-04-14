@@ -1,6 +1,7 @@
 .PHONY: deploy deploy-all undeploy undeploy-kserve status help check-kubeconfig sync clear-cache
 .PHONY: deploy-cert-manager deploy-istio deploy-lws deploy-rhcl deploy-kserve deploy-opendatahub-prerequisites deploy-cert-manager-pki
 .PHONY: undeploy-rhcl deploy-maas undeploy-maas test conformance deploy-mock-model clean-mock-model lint
+.PHONY: demo-setup demo-run demo-cleanup demo-all
 
 HELMFILE_CACHE := $(HOME)/.cache/helmfile
 # Auto-detect KServe namespace: redhat-ods-applications (EA2) or opendatahub (EA1)
@@ -34,6 +35,12 @@ help:
 	@echo "Mock model (no GPU):"
 	@echo "  make deploy-mock-model   - Deploy mock LLMInferenceService"
 	@echo "  make clean-mock-model    - Clean up mock deployment"
+	@echo ""
+	@echo "Demo (full end-to-end):"
+	@echo "  make demo-setup          - Deploy mock model + MaaS resources"
+	@echo "  make demo-run            - Run interactive demo (auth, rate limiting, inference)"
+	@echo "  make demo-cleanup        - Remove demo resources (keeps stack)"
+	@echo "  make demo-all            - Setup + run in one shot"
 	@echo ""
 	@echo "Other:"
 	@echo "  make status              - Show deployment status"
@@ -283,6 +290,18 @@ clean-mock-model: check-kubeconfig
 	-kubectl delete clusterstoragecontainer local-noop --ignore-not-found 2>/dev/null || true
 	-kubectl delete namespace "$(MOCK_NAMESPACE)" --ignore-not-found
 	@echo "=== Done ==="
+
+# Demo — end-to-end demo (requires full stack: make deploy-all RHCL=true MAAS=true)
+demo-setup: check-kubeconfig
+	@./demo/setup.sh
+
+demo-run: check-kubeconfig
+	@./demo/run.sh
+
+demo-cleanup: check-kubeconfig
+	@./demo/cleanup.sh
+
+demo-all: demo-setup demo-run
 
 # Lint — run locally before pushing to catch issues CodeRabbit would flag
 lint:

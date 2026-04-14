@@ -50,6 +50,7 @@ spec:
       {{- end }}
       securityContext:
         runAsNonRoot: true
+        fsGroup: 26
       containers:
       - name: postgresql
         image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"

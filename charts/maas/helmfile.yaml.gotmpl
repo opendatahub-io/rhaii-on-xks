@@ -69,7 +69,7 @@ releases:
 
             # Apply MaaS CRDs via server-side apply (avoids size limits)
             echo "Applying MaaS CRDs..."
-            kubectl apply -f ./crds/ --server-side
+            kubectl apply -f ./crds/ --server-side --force-conflicts
             echo "=== MaaS pre-deploy checks passed ==="
 
       - events: ["postsync"]
