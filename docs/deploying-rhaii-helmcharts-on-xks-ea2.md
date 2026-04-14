@@ -279,90 +279,20 @@ kubectl get deploy rhai-operator -n redhat-ods-operator \
 
 ---
 
-## 4. Configuring the Inference Gateway
+## 4. Inference Gateway (Automatic)
 
-The inference gateway provides external access to LLMInferenceService endpoints via the Gateway API.
+The inference gateway is now **automatically created** by the Helm chart's post-install hook (Phase 3). No manual steps are required.
 
-### 4.1 Set Up CA Bundle
+The hook automatically:
 
-Extract the CA certificate from cert-manager and create a ConfigMap for mTLS trust between inference components:
+1. Waits for Gateway API CRDs to be installed (by the cloud manager)
+2. Waits for the cert-manager CA secret (`opendatahub-ca`)
+3. Creates the `rhaii-ca-bundle` ConfigMap for mTLS trust
+4. Creates the `inference-gateway-config` ConfigMap (with Azure LB health probe annotation on AKS)
+5. Waits for the `istio` GatewayClass (created by Sail Operator)
+6. Creates the `inference-gateway` Gateway CR
 
-```bash
-# Extract CA cert from cert-manager secret
-kubectl get secret opendatahub-ca -n cert-manager \
-  -o jsonpath='{.data.ca\.crt}' | base64 -d > /tmp/ca.crt
-
-# Create CA bundle ConfigMap
-kubectl create configmap rhaii-ca-bundle \
-  --from-file=ca.crt=/tmp/ca.crt \
-  -n redhat-ods-applications \
-  --dry-run=client -o yaml | kubectl apply -f -
-```
-
-### 4.2 Create Gateway ConfigMap
-
-Configure the gateway pod to mount the CA bundle for mTLS trust. The service annotation is AKS-specific — it switches the Azure Load Balancer health probe to TCP so it can reach the Istio gateway on port 80. Omit it on CoreWeave:
-
-```bash
-kubectl apply -f - <<'EOF'
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: inference-gateway-config
-  namespace: redhat-ods-applications
-data:
-  deployment: |
-    spec:
-      template:
-        spec:
-          volumes:
-          - name: rhaii-ca-bundle
-            configMap:
-              name: rhaii-ca-bundle
-          containers:
-          - name: istio-proxy
-            volumeMounts:
-            - name: rhaii-ca-bundle
-              mountPath: /var/run/secrets/opendatahub
-              readOnly: true
-  service: |
-    metadata:
-      annotations:
-        service.beta.kubernetes.io/port_80_health-probe_protocol: tcp
-EOF
-```
-
-### 4.3 Create Gateway
-
-```bash
-kubectl apply -f - <<'EOF'
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: inference-gateway  # DO NOT CHANGE THIS VALUE
-  namespace: redhat-ods-applications
-spec:
-  gatewayClassName: istio
-  listeners:
-    - name: http
-      port: 80
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-  infrastructure:
-    labels:
-      serving.kserve.io/gateway: kserve-ingress-gateway
-    parametersRef:
-      group: ""
-      kind: ConfigMap
-      name: inference-gateway-config
-EOF
-```
-
-> **Important:** The gateway must be named `inference-gateway`. This name is configured in the `LLMInferenceServiceConfig` templates and used by the controller when `router.gateway: {}` is empty.
-
-### 4.4 Verify Gateway Deployment
+### 4.1 Verify Gateway Deployment
 
 ```bash
 kubectl get gateway -n redhat-ods-applications
@@ -382,7 +312,18 @@ kubectl get pods -n redhat-ods-applications \
   -l gateway.networking.k8s.io/gateway-name=inference-gateway
 ```
 
-> **Troubleshooting:** If the gateway shows `Programmed: False`, check istiod logs: `kubectl logs deploy/istiod -n istio-system | grep gateway`. A common cause is a missing ConfigMap referenced by `parametersRef`.
+### 4.2 Disabling Automatic Gateway Creation
+
+To manage the gateway manually, set in your values file:
+
+```yaml
+components:
+  kserve:
+    gateway:
+      create: false
+```
+
+> **Troubleshooting:** If the gateway shows `Programmed: False`, check istiod logs: `kubectl logs deploy/istiod -n istio-system | grep gateway`. Check the post-install hook job logs: `kubectl logs job/rhaii-post-install-gateway -n rhaii`.
 
 ---
 
@@ -649,7 +590,7 @@ See the [conformance manifests](https://github.com/aneeshkp/llm-d-conformance-ma
 
 **Resolution:**
 
-Either create a gateway named `inference-gateway` (see Section 4), or specify the gateway explicitly:
+The gateway is created automatically by the post-install hook. If it was disabled, either re-enable it (`components.kserve.gateway.create: true`) or specify the gateway explicitly:
 
 ```yaml
 router:
