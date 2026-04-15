@@ -1,0 +1,30 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ include "maas.gateway.name" . }}
+  namespace: {{ include "maas.gateway.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  gatewayClassName: {{ .Values.gateway.gatewayClassName }}
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: {{ .Values.gateway.listeners.http.port }}
+    allowedRoutes:
+      namespaces:
+        from: All
+  {{- if .Values.gateway.listeners.https.enabled }}
+  - name: https
+    protocol: HTTPS
+    port: {{ .Values.gateway.listeners.https.port }}
+    allowedRoutes:
+      namespaces:
+        from: All
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: maas-gateway-tls
+        kind: Secret
+  {{- end }}

@@ -1,0 +1,31 @@
+{{- if and .Values.azureAD.enabled .Values.azureAD.adminGroup }}
+{{- $tenantId := required "azureAD.tenantId is required when azureAD.enabled is true" .Values.azureAD.tenantId }}
+{{- $clientId := required "azureAD.clientId is required when azureAD.enabled is true" .Values.azureAD.clientId }}
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: maas-api-admin-only
+  namespace: {{ include "maas.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: azure-ad-auth
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: maas-api-route
+  rules:
+    authentication:
+      azure-ad:
+        jwt:
+          issuerUrl: https://login.microsoftonline.com/{{ $tenantId }}/v2.0
+          audiences:
+            - {{ $clientId }}
+    authorization:
+      admin-group-check:
+        patternMatching:
+          patterns:
+            - selector: auth.identity.groups
+              operator: incl
+              value: {{ .Values.azureAD.adminGroup | quote }}
+{{- end }}

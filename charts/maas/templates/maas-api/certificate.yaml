@@ -1,0 +1,29 @@
+{{- if .Values.maasApi.tls.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: maas-api-serving-cert
+  namespace: {{ include "maas.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+    app.kubernetes.io/name: maas-api
+spec:
+  secretName: maas-api-serving-cert
+  duration: 8760h    # 1 year
+  renewBefore: 720h  # 30 days
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - server auth
+  dnsNames:
+    - maas-api
+    - maas-api.{{ include "maas.namespace" . }}
+    - maas-api.{{ include "maas.namespace" . }}.svc
+    - maas-api.{{ include "maas.namespace" . }}.svc.cluster.local
+  issuerRef:
+    name: {{ .Values.maasApi.tls.issuerRef.name }}
+    kind: {{ .Values.maasApi.tls.issuerRef.kind }}
+    group: cert-manager.io
+{{- end }}

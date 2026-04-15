@@ -1,0 +1,36 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: maas-controller-role
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+rules:
+# Needs cluster-wide get for ExternalModel.spec.credentialRef secrets (models can be in any namespace)
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+- apiGroups: ["maas.opendatahub.io"]
+  resources: ["externalmodels", "maasauthpolicies", "maasmodelrefs", "maassubscriptions"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["maas.opendatahub.io"]
+  resources: ["externalmodels/finalizers", "maasauthpolicies/finalizers", "maasmodelrefs/finalizers", "maassubscriptions/finalizers"]
+  verbs: ["update"]
+- apiGroups: ["maas.opendatahub.io"]
+  resources: ["externalmodels/status", "maasauthpolicies/status", "maasmodelrefs/status", "maassubscriptions/status"]
+  verbs: ["get", "patch", "update"]
+- apiGroups: ["gateway.networking.k8s.io"]
+  resources: ["gateways"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["gateway.networking.k8s.io"]
+  resources: ["httproutes"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["kuadrant.io"]
+  resources: ["authpolicies", "tokenratelimitpolicies"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["serving.kserve.io"]
+  resources: ["llminferenceservices"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["create", "get", "list", "watch"]

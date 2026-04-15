@@ -1,0 +1,16 @@
+apiVersion: v2
+name: maas
+description: Models as a Service (MaaS) for xKS — API gateway authentication, authorization, rate limiting, and model subscription management
+version: 0.1.0
+appVersion: "0.0.2"
+type: application
+keywords:
+  - maas
+  - models-as-a-service
+  - kuadrant
+  - kserve
+  - rate-limiting
+  - authentication
+home: https://github.com/opendatahub-io/models-as-a-service
+sources:
+  - https://github.com/opendatahub-io/models-as-a-service

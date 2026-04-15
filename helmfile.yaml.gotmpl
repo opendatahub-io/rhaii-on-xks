@@ -6,6 +6,7 @@
 #   helmfile apply --selector name=sail-operator          # Deploy only istio
 #   helmfile apply --selector name=lws-operator           # Deploy only lws
 #   helmfile apply --selector name=rhcl                   # Deploy only RHCL (requires rhclOperator.enabled: true)
+#   helmfile apply --selector name=maas                    # Deploy only MaaS (requires maas.enabled: true)
 #   helmfile sync  --selector name=kserve-rhaii-xks        # Deploy only Kserve
 #   helmfile destroy                                      # Remove all
 
@@ -53,6 +54,38 @@ helmfiles:
           dns:
             enabled: {{ .Values.rhclOperator.operators.dns.enabled | default false }}
 {{- end }}
+{{- $gwNamespaces := list }}
+{{- if hasKey .Values.rhclOperator "gatewayNamespaces" }}
+{{-   $gwNamespaces = .Values.rhclOperator.gatewayNamespaces }}
+{{- end }}
+{{- if and (hasKey .Values "maas") .Values.maas.enabled }}
+{{-   $maasGwNs := .Values.maas.gatewayNamespace | default "istio-system" }}
+{{-   if not (has $maasGwNs $gwNamespaces) }}
+{{-     $gwNamespaces = append $gwNamespaces $maasGwNs }}
+{{-   end }}
+{{- end }}
+{{- if $gwNamespaces }}
+      - gatewayNamespaces:
+{{-   range $gwNamespaces }}
+          - {{ . }}
+{{-   end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+  # maas (Models as a Service) - optional API gateway, auth, rate limiting, subscriptions
+{{- if hasKey .Values "maas" }}
+{{- if .Values.maas.enabled }}
+  - path: charts/maas/helmfile.yaml.gotmpl
+    selectorsInherited: true
+    values:
+      - namespace: {{ .Values.maas.namespace | default "opendatahub" }}
+      - gatewayNamespace: {{ .Values.maas.gatewayNamespace | default "istio-system" }}
+      - gatewayName: {{ .Values.maas.gatewayName | default "maas-default-gateway" }}
+      - pullSecretName: redhat-pull-secret
+      - postgresqlEnabled: true
+      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth }}
+      - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
 {{- end }}
 {{- end }}
 

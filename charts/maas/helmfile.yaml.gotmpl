@@ -1,0 +1,156 @@
+# MaaS (Models as a Service) - API gateway, auth, rate limiting, subscriptions
+#
+# Prerequisites:
+#   - KServe deployed (LLMInferenceService CRDs)
+#   - RHCL deployed (Kuadrant, Authorino, Limitador operators + instances)
+#   - Istio/Sail deployed (Gateway API)
+#   - cert-manager deployed (TLS)
+#
+# Usage:
+#   helmfile apply --selector name=maas
+
+releases:
+  - name: maas
+    chart: ./
+    namespace: {{ .Values.namespace | default "opendatahub" }}
+    createNamespace: true
+    wait: false
+    set:
+{{- if .Values.useSystemPodmanAuth }}
+      - name: pullSecret.dockerConfigJson
+        file: {{ env "HOME" }}/.config/containers/auth.json
+{{- else if .Values.pullSecretFile }}
+      - name: pullSecret.dockerConfigJson
+        file: {{ .Values.pullSecretFile }}
+{{- end }}
+    hooks:
+      - events: ["presync"]
+        showlogs: true
+        command: "sh"
+        args:
+          - "-c"
+          - |
+            set -e
+            echo "=== MaaS Pre-deploy checks ==="
+
+            # Verify KServe is deployed
+            if ! kubectl get crd llminferenceservices.serving.kserve.io >/dev/null 2>&1; then
+              echo "ERROR: KServe CRDs not found. Deploy KServe first."
+              exit 1
+            fi
+
+            # Verify RHCL/Kuadrant is deployed
+            if ! kubectl get crd authpolicies.kuadrant.io >/dev/null 2>&1; then
+              echo "ERROR: Kuadrant/RHCL CRDs not found. Deploy RHCL first (make deploy-rhcl)."
+              exit 1
+            fi
+
+            # Verify Gateway API CRDs
+            if ! kubectl get crd gateways.gateway.networking.k8s.io >/dev/null 2>&1; then
+              echo "ERROR: Gateway API CRDs not found. Deploy Istio/Sail first."
+              exit 1
+            fi
+
+            # Verify Kuadrant instance exists and is ready
+            if ! kubectl get crd kuadrants.kuadrant.io >/dev/null 2>&1; then
+              echo "ERROR: Kuadrant CRD not found. Deploy RHCL first (make deploy-rhcl)."
+              exit 1
+            fi
+            KUADRANT_READY=$(kubectl get kuadrant -n kuadrant-system -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+            if [ "$KUADRANT_READY" = "True" ]; then
+              echo "Kuadrant instance found and ready in kuadrant-system"
+            elif [ -n "$KUADRANT_READY" ]; then
+              echo "ERROR: Kuadrant instance exists but is not ready (status: $KUADRANT_READY). Fix before deploying MaaS."
+              exit 1
+            else
+              echo "ERROR: No Kuadrant instance found in kuadrant-system. Auth and rate limiting policies will not be enforced."
+              exit 1
+            fi
+
+            # Apply MaaS CRDs via server-side apply (avoids size limits)
+            echo "Applying MaaS CRDs..."
+            kubectl apply -f ./crds/ --server-side --force-conflicts
+            echo "=== MaaS pre-deploy checks passed ==="
+
+      - events: ["postsync"]
+        showlogs: true
+        command: "sh"
+        args:
+          - "-c"
+          - |
+            set -e
+            NAMESPACE="{{ .Values.namespace | default "opendatahub" }}"
+            echo "=== MaaS Post-deploy validation ==="
+
+            ERRORS=0
+
+{{- if .Values.postgresqlEnabled | default true }}
+            echo "Waiting for PostgreSQL..."
+            kubectl rollout status deployment/postgres -n "$NAMESPACE" --timeout=120s 2>/dev/null || { echo "ERROR: PostgreSQL not ready"; ERRORS=$((ERRORS+1)); }
+{{- end }}
+
+            echo "Waiting for maas-controller..."
+            kubectl rollout status deployment/maas-controller -n "$NAMESPACE" --timeout=120s 2>/dev/null || { echo "ERROR: maas-controller not ready"; ERRORS=$((ERRORS+1)); }
+
+            echo "Waiting for maas-api..."
+            kubectl rollout status deployment/maas-api -n "$NAMESPACE" --timeout=120s 2>/dev/null || { echo "ERROR: maas-api not ready"; ERRORS=$((ERRORS+1)); }
+
+{{- if not (eq (index .Values "maasApiTlsEnabled" | default "true" | toString) "false") }}
+            echo "Waiting for maas-api TLS certificate..."
+            for i in $(seq 1 30); do
+              CERT_READY=$(kubectl get certificate maas-api-serving-cert -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+              if [ "$CERT_READY" = "True" ]; then
+                echo "  maas-api-serving-cert is Ready"
+                break
+              fi
+              echo "  Waiting for cert-manager to issue certificate... ($i/30)"
+              sleep 5
+            done
+            if [ "$CERT_READY" != "True" ]; then
+              echo "ERROR: maas-api-serving-cert not ready after 150s"
+              ERRORS=$((ERRORS+1))
+            fi
+{{- end }}
+
+            GATEWAY_NS="{{ .Values.gatewayNamespace | default "istio-system" }}"
+            GATEWAY_NAME="{{ .Values.gatewayName | default "maas-default-gateway" }}"
+            echo "Checking MaaS gateway..."
+            kubectl get gateway "$GATEWAY_NAME" -n "$GATEWAY_NS" 2>/dev/null || { echo "ERROR: Gateway $GATEWAY_NAME not found in $GATEWAY_NS"; ERRORS=$((ERRORS+1)); }
+
+            PULL_SECRET="{{ .Values.pullSecretName | default "redhat-pull-secret" }}"
+            GATEWAY_SA="${GATEWAY_NAME}-istio"
+            PATCHED=0
+            echo "Patching gateway service account with pull secret..."
+            for i in 1 2 3 4 5; do
+              if kubectl get sa "$GATEWAY_SA" -n "$GATEWAY_NS" >/dev/null 2>&1; then
+                if kubectl patch sa "$GATEWAY_SA" -n "$GATEWAY_NS" \
+                  -p "{\"imagePullSecrets\": [{\"name\": \"${PULL_SECRET}\"}]}" 2>/dev/null; then
+                  echo "  Gateway SA patched"
+                  PATCHED=1
+                  break
+                fi
+              fi
+              echo "  Waiting for gateway SA... ($i/5)"
+              sleep 5
+            done
+            if [ "$PATCHED" -eq 1 ]; then
+              kubectl delete pod -n "$GATEWAY_NS" -l "istio.io/gateway-name=$GATEWAY_NAME" --ignore-not-found 2>/dev/null || true
+            else
+              echo "ERROR: Gateway SA '$GATEWAY_SA' not found or patch failed after 25s"
+              ERRORS=$((ERRORS+1))
+            fi
+
+            if [ "$ERRORS" -gt 0 ]; then
+              echo "ERROR: $ERRORS component(s) not ready. Check pod status."
+              exit 1
+            fi
+
+            echo ""
+            echo "=== MaaS deployment status ==="
+            echo "maas-controller:"
+            kubectl get pods -n "$NAMESPACE" -l control-plane=maas-controller 2>/dev/null || echo "  Not found"
+            echo "maas-api:"
+            kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=maas-api 2>/dev/null || echo "  Not found"
+            echo "postgresql:"
+            kubectl get pods -n "$NAMESPACE" -l app=postgres 2>/dev/null || echo "  Not found"
+            echo "=== MaaS post-deploy validation complete ==="

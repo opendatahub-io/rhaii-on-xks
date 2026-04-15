@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o pipefail
 # Cleanup script for rhaii-on-xks
 # Runs helmfile destroy and cleans up presync/template resources
 
@@ -60,11 +61,11 @@ helmfile destroy 2>/dev/null || true
 
 # Remove finalizers from stuck resources
 log "Removing finalizers from stuck resources..."
-kubectl get istiorevision -A -o name 2>/dev/null | while read rev; do
-    kubectl patch $rev -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+kubectl get istiorevision -A -o name 2>/dev/null | while read -r rev; do
+    kubectl patch "$rev" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
 done
-kubectl get istio -A -o name 2>/dev/null | while read ist; do
-    kubectl patch $ist -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+kubectl get istio -A -o name 2>/dev/null | while read -r ist; do
+    kubectl patch "$ist" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
 done
 kubectl patch infrastructure cluster -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
 kubectl patch certmanager cluster -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
@@ -90,6 +91,27 @@ kubectl get clusterrole,clusterrolebinding,mutatingwebhookconfiguration,validati
 log "Cleaning up cert-manager cluster-scoped resources..."
 kubectl get clusterrole,clusterrolebinding,mutatingwebhookconfiguration,validatingwebhookconfiguration -o name 2>/dev/null \
     | grep -i cert-manager | xargs -r kubectl delete --ignore-not-found 2>/dev/null || true
+
+# Clean up RHCL/Kuadrant resources
+log "Cleaning up RHCL/Kuadrant resources..."
+timeout 10 kubectl delete kuadrant --all -n kuadrant-system --ignore-not-found 2>/dev/null || true
+timeout 10 kubectl delete authorino --all -n kuadrant-system --ignore-not-found 2>/dev/null || true
+timeout 10 kubectl delete limitador --all -n kuadrant-system --ignore-not-found 2>/dev/null || true
+for res in kuadrant authorino limitador; do
+    kubectl get "$res" -n kuadrant-system -o name 2>/dev/null | while read -r cr; do
+        kubectl patch "$cr" -n kuadrant-system -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+    done
+done
+kubectl get clusterrole,clusterrolebinding -o name 2>/dev/null \
+    | grep -iE "kuadrant|authorino|limitador" | xargs -r kubectl delete --ignore-not-found 2>/dev/null || true
+
+# Clean up MaaS resources
+log "Cleaning up MaaS resources..."
+kubectl get clusterrole,clusterrolebinding -o name 2>/dev/null \
+    | grep -iE "maas-controller|maas-api" | xargs -r kubectl delete --ignore-not-found 2>/dev/null || true
+MAAS_GW_NS="${MAAS_GATEWAY_NS:-istio-system}"
+kubectl delete gateway maas-default-gateway -n "$MAAS_GW_NS" --ignore-not-found 2>/dev/null || true
+kubectl delete authpolicy,tokenratelimitpolicy -n "$MAAS_GW_NS" --all --ignore-not-found 2>/dev/null || true
 
 # Delete CRDs installed by this repo (Helm does not remove CRDs on uninstall)
 log "Cleaning up CRDs..."
@@ -117,6 +139,14 @@ done
 echo "$CRDS" | grep -E "serving\.kserve\.io" | while read -r crd; do
     kubectl delete "$crd" --ignore-not-found 2>/dev/null || true
 done
+# RHCL/Kuadrant CRDs
+echo "$CRDS" | grep -E "kuadrant\.io" | while read -r crd; do
+    kubectl delete "$crd" --ignore-not-found 2>/dev/null || true
+done
+# MaaS CRDs
+echo "$CRDS" | grep -E "maas\.opendatahub\.io" | while read -r crd; do
+    kubectl delete "$crd" --ignore-not-found 2>/dev/null || true
+done
 # Infrastructure stub CRD
 kubectl delete crd infrastructures.config.openshift.io --ignore-not-found 2>/dev/null || true
 
@@ -127,5 +157,8 @@ kubectl delete namespace cert-manager-operator --ignore-not-found --wait=false 2
 kubectl delete namespace istio-system --ignore-not-found --wait=false 2>/dev/null || true
 kubectl delete namespace openshift-lws-operator --ignore-not-found --wait=false 2>/dev/null || true
 kubectl delete namespace opendatahub --ignore-not-found --wait=false 2>/dev/null || true
+kubectl delete namespace kuadrant-operators --ignore-not-found --wait=false 2>/dev/null || true
+kubectl delete namespace kuadrant-system --ignore-not-found --wait=false 2>/dev/null || true
+kubectl delete namespace models-as-a-service --ignore-not-found --wait=false 2>/dev/null || true
 
 log "=== Cleanup Complete ==="

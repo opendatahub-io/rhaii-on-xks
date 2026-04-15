@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maas-controller
+  namespace: {{ include "maas.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+    control-plane: maas-controller
+    app: maas-controller
+spec:
+  selector:
+    matchLabels:
+      control-plane: maas-controller
+  replicas: {{ .Values.maasController.replicas }}
+  template:
+    metadata:
+      labels:
+        control-plane: maas-controller
+        app: maas-controller
+        {{- include "maas.labels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: maas-controller
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: manager
+        image: "{{ .Values.maasController.image.repository }}:{{ .Values.maasController.image.tag }}"
+        imagePullPolicy: {{ .Values.maasController.image.pullPolicy }}
+        command:
+        - /manager
+        args:
+          - --leader-elect
+          - --health-probe-bind-address=:8081
+          - --gateway-name={{ include "maas.gateway.name" . }}
+          - --gateway-namespace={{ include "maas.gateway.namespace" . }}
+          - --maas-api-namespace=$(MAAS_API_NAMESPACE)
+          - --maas-subscription-namespace={{ .Values.maasController.subscriptionNamespace }}
+          - --cluster-audience={{ .Values.maasController.clusterAudience }}
+        env:
+          - name: MAAS_API_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          {{- toYaml .Values.maasController.resources | nindent 10 }}

@@ -1,0 +1,9 @@
+{{/* Main namespace (opendatahub) is created by helmfile createNamespace or KServe.
+     Only create the subscription namespace here. */}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.maasApi.subscriptionNamespace }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: subscriptions

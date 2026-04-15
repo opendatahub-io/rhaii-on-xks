@@ -1,0 +1,31 @@
+{{/*
+  Manual RateLimitPolicy for request-based rate limiting.
+
+  The maas-controller auto-generates TokenRateLimitPolicy per model for
+  token-based limits from MaaSSubscription CRDs. However, there is no
+  upstream CRD field for request-based limits (maxRequests in tierMapping).
+
+  This policy provides gateway-level request rate limiting as a safety net
+  until the upstream CRD supports requestRateLimits natively.
+*/}}
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: gateway-request-rate-limit
+  namespace: {{ include "maas.gateway.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rate-limiting
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: {{ include "maas.gateway.name" . }}
+  defaults:
+    limits:
+      gateway-request-cap:
+        rates:
+        - limit: 1000
+          window: 1m
+        counters:
+        - expression: "request.headers['x-maas-api-key'] != '' ? request.headers['x-maas-api-key'] : request.source_address"

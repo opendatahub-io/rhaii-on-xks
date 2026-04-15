@@ -1,0 +1,128 @@
+{{- if .Values.postgresql.enabled }}
+{{- if eq (.Values.postgresql.storage.type | default "emptyDir") "persistentVolumeClaim" }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: {{ include "maas.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.storage.pvc.size | default "1Gi" }}
+  {{- if .Values.postgresql.storage.pvc.storageClassName }}
+  storageClassName: {{ .Values.postgresql.storage.pvc.storageClassName }}
+  {{- end }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: {{ include "maas.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  {{- if eq (.Values.postgresql.storage.type | default "emptyDir") "persistentVolumeClaim" }}
+  strategy:
+    type: Recreate
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: postgres
+        {{- include "maas.labels" . | nindent 8 }}
+        app.kubernetes.io/component: database
+    spec:
+      {{- if .Values.pullSecret.dockerConfigJson }}
+      imagePullSecrets:
+      - name: {{ .Values.pullSecret.name }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 26
+      containers:
+      - name: postgresql
+        image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+        ports:
+        - containerPort: 5432
+          name: postgres
+          protocol: TCP
+        env:
+        - name: POSTGRESQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgres-creds" }}
+              key: POSTGRESQL_USER
+        - name: POSTGRESQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgres-creds" }}
+              key: POSTGRESQL_PASSWORD
+        - name: POSTGRESQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.postgresql.auth.existingSecret | default "postgres-creds" }}
+              key: POSTGRESQL_DATABASE
+        resources:
+          {{- toYaml .Values.postgresql.resources | nindent 10 }}
+        volumeMounts:
+        - name: pgdata
+          mountPath: /var/lib/pgsql/data
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRESQL_USER -d $POSTGRESQL_DATABASE
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRESQL_USER -d $POSTGRESQL_DATABASE
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+      volumes:
+      - name: pgdata
+        {{- if eq (.Values.postgresql.storage.type | default "emptyDir") "persistentVolumeClaim" }}
+        persistentVolumeClaim:
+          claimName: postgres-data
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ include "maas.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+    protocol: TCP
+  type: ClusterIP
+{{- end }}

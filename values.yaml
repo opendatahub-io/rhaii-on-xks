@@ -34,6 +34,17 @@ rhclOperator:
   operators:
     dns:
       enabled: false
+  # Namespaces where wasm-plugin-pull-secret is needed (for Envoy proxies).
+  # When MaaS is enabled, istio-system is auto-added by the root helmfile.
+  gatewayNamespaces: []
+
+# maas (Models as a Service) - optional API gateway, auth, rate limiting, subscriptions
+# Requires RHCL and KServe to be deployed first
+maas:
+  enabled: false
+  namespace: opendatahub
+  gatewayNamespace: istio-system
+  gatewayName: maas-default-gateway
 
 # =============================================================================
 # KServe

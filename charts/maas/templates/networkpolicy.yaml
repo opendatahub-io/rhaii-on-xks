@@ -1,0 +1,51 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: maas-authorino-allow
+  namespace: {{ include "maas.namespace" . }}
+  labels:
+    {{- include "maas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: networking
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: maas-api
+  policyTypes:
+  - Ingress
+  ingress:
+  # Authorino callback traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kuadrant-system
+      podSelector:
+        matchLabels:
+          authorino-resource: authorino
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kuadrant-operators
+      podSelector:
+        matchLabels:
+          authorino-resource: authorino
+    ports:
+    - port: {{ if .Values.maasApi.tls.enabled }}8443{{ else }}8080{{ end }}
+      protocol: TCP
+  # Istio gateway proxy traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ include "maas.gateway.namespace" . }}
+      podSelector:
+        matchLabels:
+          istio.io/gateway-name: {{ include "maas.gateway.name" . }}
+    ports:
+    - port: {{ if .Values.maasApi.tls.enabled }}8443{{ else }}8080{{ end }}
+      protocol: TCP
+  # Istio sidecar health checks and inter-pod mesh traffic
+  - from:
+    - podSelector: {}
+    ports:
+    - port: 15090
+      protocol: TCP
+    - port: 15021
+      protocol: TCP

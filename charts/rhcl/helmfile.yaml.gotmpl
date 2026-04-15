@@ -53,6 +53,12 @@ releases:
           pullSecret:
             dockerConfigJson: {{ exec "cat" (list $resolvedPath) | quote }}
 {{- end }}
+{{- if .Values.gatewayNamespaces }}
+      - gatewayNamespaces:
+{{-   range .Values.gatewayNamespaces }}
+          - {{ . }}
+{{-   end }}
+{{- end }}
     hooks:
       # ======================================================================
       # PREUNINSTALL: Clean up Kuadrant instance before removing operators
